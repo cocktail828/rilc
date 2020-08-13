@@ -1,0 +1,95 @@
+#include <string>
+
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include "serial.h"
+#include "logger.h"
+
+Serial::Serial(const char *d)
+    : m_device(d), m_handle(0),
+      m_is_ready(false), m_baud(BR115200)
+{
+}
+
+Serial::~Serial()
+{
+    close(m_handle);
+    m_is_ready = false;
+    LOGI << "Serial close " << m_device << " fd = " << m_handle << ENDL;
+}
+
+void Serial::Open(const char *d, BaudRate baud)
+{
+    m_is_ready = false;
+    if (d)
+        m_device = d;
+
+    int fd = open(m_device.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (fd < 0)
+    {
+        LOGE << "fail open " << m_device << " for " << strerror(errno) << ENDL;
+        m_handle = 0;
+        m_is_ready = false;
+        return;
+    }
+
+    m_handle = fd;
+    m_is_ready = true;
+    Init(baud);
+    LOGI << "Serial open " << m_device << " fd = " << m_handle << ENDL;
+}
+
+void Serial::Close()
+{
+    m_is_ready = false;
+    close(m_handle);
+}
+
+void Serial::Init(BaudRate baud)
+{
+    struct termios tio;
+    struct termios settings;
+    memset(&tio, 0, sizeof(tio));
+    tio.c_iflag = 0;
+    tio.c_oflag = 0;
+    tio.c_cflag = CS8 | CREAD | CLOCAL; // 8n1, see termios.h for more information
+    tio.c_lflag = 0;
+    tio.c_cc[VMIN] = 1;
+    tio.c_cc[VTIME] = 5;
+    cfsetospeed(&tio, baud); // 115200 baud
+    cfsetispeed(&tio, baud); // 115200 baud
+    tcsetattr(m_handle, TCSANOW, &tio);
+    if (tcgetattr(m_handle, &settings) < 0)
+        return;
+
+    cfmakeraw(&settings);
+    settings.c_cflag |= CREAD | CLOCAL;
+    tcflush(m_handle, TCIOFLUSH);
+    tcsetattr(m_handle, TCSANOW, &settings);
+
+    m_baud = baud;
+}
+
+bool Serial::IsReady()
+{
+    return m_is_ready;
+}
+
+int Serial::Handle()
+{
+    return m_handle;
+}
+
+bool Serial::SendAsync(uint8_t *data, size_t len)
+{
+    return write(m_handle, data, len);
+}
+
+bool Serial::RecvAsync(uint8_t *data, size_t len)
+{
+    return read(m_handle, data, len);
+}
