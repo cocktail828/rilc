@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#ifndef __RIL
+#define __RIL
+
 static const char *SETUP_DATA_PROTOCOL_IP = "IP";
 static const char *SETUP_DATA_PROTOCOL_IPV6 = "IPV6";
 static const char *SETUP_DATA_PROTOCOL_IPV4V6 = "IPV4V6";
@@ -286,5 +289,7 @@ cat include/telephony/ril.h | \
     RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED = 1031,
     RIL_UNSOl_CDMA_PRL_CHANGED = 1032,
     RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE = 1033,
-    RIL_UNSOL_RIL_CONNECTED = 1034,
+    RIL_UNSOL_RIL_CONNECTED = 1034
 };
+
+#endif //__RIL

@@ -4,6 +4,8 @@
 #include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <linux/un.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -87,9 +89,40 @@ bool DeviceManager::isReady()
     return mReady;
 }
 
+static int open_tty(const char *d)
+{
+    return open(d, O_RDWR | O_NOCTTY | O_NONBLOCK);
+}
+
+static int open_unix_sock(const char *d)
+{
+    int sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sockfd < 0)
+        return -1;
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(sockaddr));
+    addr.sun_family = AF_UNIX;
+
+    /* do not generate socket file */
+    memcpy(addr.sun_path + 1, d, strlen(d));
+    socklen_t slen = offsetof(sockaddr_un, sun_path) + strlen(d) + 1;
+    if (connect(sockfd, (struct sockaddr *)&addr, slen) < 0)
+        return -1;
+
+    int soflag = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &soflag, sizeof(soflag));
+    return sockfd;
+}
+
 bool DeviceManager::openDevice()
 {
-    int fd = open(mDevice.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+    int fd;
+    if (mDevice.find("/dev") != std::string::npos)
+        fd = open_tty(mDevice.c_str());
+    else
+        fd = open_unix_sock(mDevice.c_str());
+    
     if (fd < 0)
         return false;
 
@@ -100,6 +133,9 @@ bool DeviceManager::openDevice()
 
 bool DeviceManager::closeDevice()
 {
+    /* close file descriper first, so polling thread will quit */
+    close(mHandle);
+
     /* remove all the ovservers */
     for (auto o : mObservers)
     {

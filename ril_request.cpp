@@ -12,7 +12,7 @@ int RilRequest::mGlobalRequestId = 0;
 bool RilRequest::mReady = false;
 std::mutex RilRequest::mGlobalLock;
 
-RilRequest *RilRequest::obtain(int cid, Response *result)
+RilRequest *RilRequest::obtain(int cid, RilResponse *result)
 {
     RilRequest *rr = new RilRequest();
     return rr;
@@ -41,16 +41,15 @@ bool RilRequest::init(const char *device)
 
 bool RilRequest::uninit()
 {
-    bool ret = false;
     if (mDeviceMgr)
     {
         if (mDeviceMgr->closeDevice())
         {
             delete mDeviceMgr;
-            ret = true;
+            return true;
         }
     }
-    return ret;
+    return false;
 }
 
 bool RilRequest::isReady()
@@ -87,15 +86,15 @@ void RilRequest::update(void *_arg)
         mCond.notify_one();
     }
 
-    // Argument *arg = reinterpret_cast<Argument *>(_arg);
-    // if (arg->type == RESPONSE_SOLICITED)
-    // {
-    //     processSolicited(arg->parcel);
-    // }
-    // else if (arg->type == RESPONSE_UNSOLICITED)
-    // {
-    //     processUnsolicited(arg->parcel);
-    // }
+    Argument *arg = reinterpret_cast<Argument *>(_arg);
+    if (arg->type == RESPONSE_SOLICITED)
+    {
+        processSolicited(arg->parcel);
+    }
+    else if (arg->type == RESPONSE_UNSOLICITED)
+    {
+        processUnsolicited(arg->parcel);
+    }
 
     return;
 }
@@ -158,17 +157,333 @@ void RilRequest::processSolicited(Parcel &p)
     int error = p.readInt();
     if (error == 0 || p.dataAvail() > 0)
     {
-        int i = 0;
         // either command succeeds or command fails but with data payload
-        do
+        switch (get_commandid())
         {
-            if (ril_commands[i].commandid == get_commandid())
-            {
-                ril_commands[i].response_function(p);
-                return;
-            }
-            i++;
-        } while (1);
+        // case RIL_REQUEST_GET_SIM_STATUS:
+        //     responseIccCardStatus(p);
+        //     return;
+        // case RIL_REQUEST_ENTER_SIM_PIN:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_ENTER_SIM_PUK:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_ENTER_SIM_PIN2:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_ENTER_SIM_PUK2:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_CHANGE_SIM_PIN:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_CHANGE_SIM_PIN2:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_GET_CURRENT_CALLS:
+        //     responseCallList(p);
+        //     return;
+        // case RIL_REQUEST_DIAL:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_GET_IMSI:
+        //     responseString(p);
+        //     return;
+        // case RIL_REQUEST_HANGUP:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CONFERENCE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_UDUB:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_LAST_CALL_FAIL_CAUSE:
+        //     responseInts(p);
+        //     return;
+        case RIL_REQUEST_SIGNAL_STRENGTH:
+            responseSignalStrength(p);
+            return;
+        // case RIL_REQUEST_VOICE_REGISTRATION_STATE:
+        //     responseStrings(p);
+        //     return;
+        // case RIL_REQUEST_DATA_REGISTRATION_STATE:
+        //     responseStrings(p);
+        //     return;
+        // case RIL_REQUEST_OPERATOR:
+        //     responseStrings(p);
+        //     return;
+        // case RIL_REQUEST_RADIO_POWER:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_DTMF:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_SEND_SMS:
+        //     responseSMS(p);
+        //     return;
+        // case RIL_REQUEST_SEND_SMS_EXPECT_MORE:
+        //     responseSMS(p);
+        //     return;
+        // case RIL_REQUEST_SETUP_DATA_CALL:
+        //     responseSetupDataCall(p);
+        //     return;
+        // case RIL_REQUEST_SIM_IO:
+        //     responseICC_IO(p);
+        //     return;
+        // case RIL_REQUEST_SEND_USSD:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CANCEL_USSD:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_GET_CLIR:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_SET_CLIR:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_QUERY_CALL_FORWARD_STATUS:
+        //     responseCallForward(p);
+        //     return;
+        // case RIL_REQUEST_SET_CALL_FORWARD:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_QUERY_CALL_WAITING:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_SET_CALL_WAITING:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_SMS_ACKNOWLEDGE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_GET_IMEI:
+        //     responseString(p);
+        //     return;
+        // case RIL_REQUEST_GET_IMEISV:
+        //     responseString(p);
+        //     return;
+        // case RIL_REQUEST_ANSWER:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_DEACTIVATE_DATA_CALL:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_QUERY_FACILITY_LOCK:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_SET_FACILITY_LOCK:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_CHANGE_BARRING_PASSWORD:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_QUERY_AVAILABLE_NETWORKS:
+        //     responseOperatorInfos(p);
+        //     return;
+        // case RIL_REQUEST_DTMF_START:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_DTMF_STOP:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_BASEBAND_VERSION:
+        //     responseString(p);
+        //     return;
+        // case RIL_REQUEST_SEPARATE_CONNECTION:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_SET_MUTE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_GET_MUTE:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_QUERY_CLIP:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_DATA_CALL_LIST:
+        //     responseDataCallList(p);
+        //     return;
+        // case RIL_REQUEST_RESET_RADIO:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_OEM_HOOK_RAW:
+        //     responseRaw(p);
+        //     return;
+        // case RIL_REQUEST_OEM_HOOK_STRINGS:
+        //     responseStrings(p);
+        //     return;
+        // case RIL_REQUEST_SCREEN_STATE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_WRITE_SMS_TO_SIM:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_DELETE_SMS_ON_SIM:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_SET_BAND_MODE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_STK_GET_PROFILE:
+        //     responseString(p);
+        //     return;
+        // case RIL_REQUEST_STK_SET_PROFILE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND:
+        //     responseString(p);
+        //     return;
+        // case RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_EXPLICIT_CALL_TRANSFER:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE:
+        //     responseGetPreferredNetworkType(p);
+        //     return;
+        // case RIL_REQUEST_GET_NEIGHBORING_CELL_IDS:
+        //     responseCellList(p);
+        //     return;
+        // case RIL_REQUEST_SET_LOCATION_UPDATES:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_SET_TTY_MODE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_QUERY_TTY_MODE:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_FLASH:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_BURST_DTMF:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_SEND_SMS:
+        //     responseSMS(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_GSM_GET_BROADCAST_CONFIG:
+        //     responseGmsBroadcastConfig(p);
+        //     return;
+        // case RIL_REQUEST_GSM_SET_BROADCAST_CONFIG:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_GSM_BROADCAST_ACTIVATION:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_GET_BROADCAST_CONFIG:
+        //     responseCdmaBroadcastConfig(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_BROADCAST_ACTIVATION:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_VALIDATE_AND_WRITE_AKEY:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_SUBSCRIPTION:
+        //     responseStrings(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_DEVICE_IDENTITY:
+        //     responseStrings(p);
+        //     return;
+        // case RIL_REQUEST_GET_SMSC_ADDRESS:
+        //     responseString(p);
+        //     return;
+        // case RIL_REQUEST_SET_SMSC_ADDRESS:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_REPORT_SMS_MEMORY_STATUS:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE:
+        //     responseInts(p);
+        //     return;
+        // case RIL_REQUEST_ISIM_AUTHENTICATION:
+        //     responseString(p);
+        //     return;
+        // case RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU:
+        //     responseVoid(p);
+        //     return;
+        // case RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS:
+        //     responseICC_IO(p);
+        //     return;
+        default:
+            LOGW << "currently not supported" << ENDL;
+        }
     }
 }
 
@@ -176,17 +491,114 @@ void RilRequest::processUnsolicited(Parcel &p)
 {
     int cmdid = p.readInt();
 
-    int i = 0;
     // either command succeeds or command fails but with data payload
-    do
+    switch (cmdid)
     {
-        if (ril_commands[i].commandid == cmdid)
-        {
-            ril_commands[i].response_function(p);
-            break;
-        }
-        i++;
-    } while (1);
+    // case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_RESPONSE_NEW_SMS:
+    //     ret = responseString(p);
+    //     break;
+    // case RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT:
+    //     ret = responseString(p);
+    //     break;
+    // case RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM:
+    //     ret = responseInts(p);
+    //     break;
+    // case RIL_UNSOL_ON_USSD:
+    //     ret = responseStrings(p);
+    //     break;
+    // case RIL_UNSOL_NITZ_TIME_RECEIVED:
+    //     ret = responseString(p);
+    //     break;
+    // case RIL_UNSOL_SIGNAL_STRENGTH:
+    //     ret = responseSignalStrength(p);
+    //     break;
+    // case RIL_UNSOL_DATA_CALL_LIST_CHANGED:
+    //     ret = responseDataCallList(p);
+    //     break;
+    // case RIL_UNSOL_SUPP_SVC_NOTIFICATION:
+    //     ret = responseSuppServiceNotification(p);
+    //     break;
+    // case RIL_UNSOL_STK_SESSION_END:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_STK_PROACTIVE_COMMAND:
+    //     ret = responseString(p);
+    //     break;
+    // case RIL_UNSOL_STK_EVENT_NOTIFY:
+    //     ret = responseString(p);
+    //     break;
+    // case RIL_UNSOL_STK_CALL_SETUP:
+    //     ret = responseInts(p);
+    //     break;
+    // case RIL_UNSOL_SIM_SMS_STORAGE_FULL:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_SIM_REFRESH:
+    //     ret = responseInts(p);
+    //     break;
+    // case RIL_UNSOL_CALL_RING:
+    //     ret = responseCallRing(p);
+    //     break;
+    // case RIL_UNSOL_RESTRICTED_STATE_CHANGED:
+    //     ret = responseInts(p);
+    //     break;
+    // case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_RESPONSE_CDMA_NEW_SMS:
+    //     ret = responseCdmaSms(p);
+    //     break;
+    // case RIL_UNSOL_RESPONSE_NEW_BROADCAST_SMS:
+    //     ret = responseRaw(p);
+    //     break;
+    // case RIL_UNSOL_CDMA_RUIM_SMS_STORAGE_FULL:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_ENTER_EMERGENCY_CALLBACK_MODE:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_CDMA_CALL_WAITING:
+    //     ret = responseCdmaCallWaiting(p);
+    //     break;
+    // case RIL_UNSOL_CDMA_OTA_PROVISION_STATUS:
+    //     ret = responseInts(p);
+    //     break;
+    // case RIL_UNSOL_CDMA_INFO_REC:
+    //     ret = responseCdmaInformationRecord(p);
+    //     break;
+    // case RIL_UNSOL_OEM_HOOK_RAW:
+    //     ret = responseRaw(p);
+    //     break;
+    // case RIL_UNSOL_RINGBACK_TONE:
+    //     ret = responseInts(p);
+    //     break;
+    // case RIL_UNSOL_RESEND_INCALL_MUTE:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
+    //     ret = responseInts(p);
+    //     break;
+    // case RIL_UNSOl_CDMA_PRL_CHANGED:
+    //     ret = responseInts(p);
+    //     break;
+    // case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE:
+    //     ret = responseVoid(p);
+    //     break;
+    // case RIL_UNSOL_RIL_CONNECTED:
+    //     ret = responseInts(p);
+    //     break;
+    default:
+        LOGE << "un recognized commandid" << ENDL;
+    }
 
     switch (cmdid)
     {

@@ -3,7 +3,7 @@
 #include "ril_response.h"
 #include "logger.h"
 
-#define VERBOSE 0
+#define RIL_VERBOSE 0
 
 void getIccCardStatus(RilResponse *result)
 {
@@ -11,7 +11,7 @@ void getIccCardStatus(RilResponse *result)
     //       but this request is also valid for SIM and RUIM
     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_GET_SIM_STATUS, result);
 
-    if (VERBOSE)
+    if (RIL_VERBOSE)
         LOGV << rr->serialString() << "> " << rr->requestToString() << ENDL;
 
     RILREQUEST::send(rr);
@@ -28,7 +28,7 @@ void getIccCardStatus(RilResponse *result)
 //     //       but this request is also valid for SIM and RUIM
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_ENTER_SIM_PIN, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeInt(2);
@@ -49,7 +49,7 @@ void getIccCardStatus(RilResponse *result)
 //     //       but this request is also valid for SIM and RUIM
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_ENTER_SIM_PUK, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeInt(3);
@@ -71,7 +71,7 @@ void getIccCardStatus(RilResponse *result)
 //     //       but this request is also valid for SIM and RUIM
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_ENTER_SIM_PIN2, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeInt(2);
@@ -92,7 +92,7 @@ void getIccCardStatus(RilResponse *result)
 //     //       but this request is also valid for SIM and RUIM
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_ENTER_SIM_PUK2, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeInt(3);
@@ -114,7 +114,7 @@ void getIccCardStatus(RilResponse *result)
 //     //       but this request is also valid for SIM and RUIM
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CHANGE_SIM_PIN, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeInt(3);
@@ -136,7 +136,7 @@ void getIccCardStatus(RilResponse *result)
 //     //       but this request is also valid for SIM and RUIM
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CHANGE_SIM_PIN2, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeInt(3);
@@ -152,7 +152,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CHANGE_BARRING_PASSWORD, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeInt(3);
@@ -168,7 +168,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeInt(1);
@@ -182,7 +182,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_GET_CURRENT_CALLS, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -199,7 +199,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_DATA_CALL_LIST, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -232,7 +232,7 @@ void getIccCardStatus(RilResponse *result)
 //         rr.mp.writeByteArray(uusInfo.getUserData());
 //     }
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -243,7 +243,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_GET_IMSI, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -254,7 +254,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_GET_IMEI, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -265,7 +265,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_GET_IMEISV, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -274,12 +274,12 @@ void getIccCardStatus(RilResponse *result)
 // public
 // void hangupConnection(int gsmIndex, RilResponse *result)
 // {
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         riljLog("hangupConnection: gsmIndex=" + gsmIndex);
 
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_HANGUP, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " +
 //                 gsmIndex);
 
@@ -295,7 +295,7 @@ void getIccCardStatus(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND,
 //                                         result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -307,7 +307,7 @@ void getIccCardStatus(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND,
 //         result);
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -319,7 +319,7 @@ void getIccCardStatus(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE,
 //         result);
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -330,7 +330,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CONFERENCE, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -361,7 +361,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_SEPARATE_CONNECTION, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + gsmIndex);
 
 //     rr.mp.writeInt(1);
@@ -375,7 +375,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_ANSWER, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -386,7 +386,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_UDUB, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -397,7 +397,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_EXPLICIT_CALL_TRANSFER, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -408,7 +408,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_LAST_CALL_FAIL_CAUSE, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -431,7 +431,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -442,7 +442,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_SET_MUTE, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + enableMute);
 
 //     rr.mp.writeInt(1);
@@ -456,7 +456,7 @@ void getIccCardStatus(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_GET_MUTE, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -466,7 +466,7 @@ void getSignalStrength(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_SIGNAL_STRENGTH, result);
 
-    if (VERBOSE)
+    if (RIL_VERBOSE)
         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
     RILREQUEST::send(rr);
@@ -477,7 +477,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_VOICE_REGISTRATION_STATE, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -488,7 +488,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_DATA_REGISTRATION_STATE, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -499,7 +499,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_OPERATOR, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -510,7 +510,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_DTMF, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeString(Character.toString(c));
@@ -523,7 +523,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_DTMF_START, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeString(Character.toString(c));
@@ -536,7 +536,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_DTMF_STOP, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -552,7 +552,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeString(Integer.toString(on));
 //     rr.mp.writeString(Integer.toString(off));
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + dtmfString);
 
 //     RILREQUEST::send(rr);
@@ -567,7 +567,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeString(smscPDU);
 //     rr.mp.writeString(pdu);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -617,11 +617,11 @@ void getSignalStrength(RilResponse *result)
 //     }
 //     catch (IOException ex)
 //     {
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             riljLog("sendSmsCdma: conversion from input stream to object failed: " + ex);
 //     }
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -638,7 +638,7 @@ void getSignalStrength(RilResponse *result)
 
 //     if (false)
 //     {
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + index);
 //     }
 
@@ -656,7 +656,7 @@ void getSignalStrength(RilResponse *result)
 
 //     if (false)
 //     {
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + index);
 //     }
 
@@ -677,7 +677,7 @@ void getSignalStrength(RilResponse *result)
 
 //     if (false)
 //     {
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + status);
 //     }
 
@@ -697,7 +697,7 @@ void getSignalStrength(RilResponse *result)
 
 //     if (false)
 //     {
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + status);
 //     }
 
@@ -744,7 +744,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeString(authType);
 //     rr.mp.writeString(protocol);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + radioTechnology + " " + profile + " " + apn + " " + user + " " + password + " " + authType + " " + protocol);
 
 //     RILREQUEST::send(rr);
@@ -759,7 +759,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeString(Integer.toString(cid));
 //     rr.mp.writeString(Integer.toString(reason));
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         riljLog(rr->serialString() + "> " +
 //                 requestToString(rr.mRequest) + " " + cid + " " + reason);
 
@@ -774,7 +774,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(on ? 1 : 0);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //     {
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ (on ? " on" : " off"));
 //     }
@@ -790,7 +790,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(enable ? 1 : 0);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -805,7 +805,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(success ? 1 : 0);
 //     rr.mp.writeInt(cause);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + success + " " + cause);
 
 //     RILREQUEST::send(rr);
@@ -820,7 +820,7 @@ void getSignalStrength(RilResponse *result)
 //     // cause code according to X.S004-550E
 //     rr.mp.writeInt(cause);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + success + " " + cause);
 
 //     RILREQUEST::send(rr);
@@ -835,7 +835,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeString(success ? "1" : "0");
 //     rr.mp.writeString(ackPdu);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ ' ' + success + " [" + ackPdu + ']');
 
 //     RILREQUEST::send(rr);
@@ -858,7 +858,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeString(data);
 //     rr.mp.writeString(pin2);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         riljLogLOGV << ialString() + "> iccIO: " << rr->requestToString() << ENDL+ " 0x" + Integer.toHexString(command) + " 0x" + Integer.toHexString(fileid) + " " + " path: " + path + "," + p1 + "," + p2 + "," + p3);
 
 //     RILREQUEST::send(rr);
@@ -869,7 +869,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_GET_CLIR, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -885,7 +885,7 @@ void getSignalStrength(RilResponse *result)
 
 //     rr.mp.writeInt(clirMode);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + clirMode);
 
 //     RILREQUEST::send(rr);
@@ -899,7 +899,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(serviceClass);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + serviceClass);
 
 //     RILREQUEST::send(rr);
@@ -914,7 +914,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(enable ? 1 : 0);
 //     rr.mp.writeInt(serviceClass);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + enable + ", " + serviceClass);
 
 //     RILREQUEST::send(rr);
@@ -926,7 +926,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC,
 //                                         response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -938,7 +938,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL,
 //                                         response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + operatorNumeric);
 
 //     rr.mp.writeString(operatorNumeric);
@@ -952,7 +952,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE,
 //                                         response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -964,7 +964,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_QUERY_AVAILABLE_NETWORKS,
 //                                         response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -983,7 +983,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeString(number);
 //     rr.mp.writeInt(timeSeconds);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + action + " " + cfReason + " " + serviceClass + timeSeconds);
 
 //     RILREQUEST::send(rr);
@@ -1002,7 +1002,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeString(number);
 //     rr.mp.writeInt(0);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + cfReason + " " + serviceClass);
 
 //     RILREQUEST::send(rr);
@@ -1013,7 +1013,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_QUERY_CLIP, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1024,7 +1024,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_BASEBAND_VERSION, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1041,7 +1041,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_QUERY_FACILITY_LOCK, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     // count strings
@@ -1068,7 +1068,7 @@ void getSignalStrength(RilResponse *result)
 //     String lockString;
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_SET_FACILITY_LOCK, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     // count strings
@@ -1089,7 +1089,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_SEND_USSD, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + ussdString);
 
 //     rr.mp.writeString(ussdString);
@@ -1103,7 +1103,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CANCEL_USSD, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1114,7 +1114,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_RESET_RADIO, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1125,7 +1125,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_OEM_HOOK_RAW, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ "[" + IccUtils.bytesToHexString(data) + "]");
 
 //     rr.mp.writeByteArray(data);
@@ -1138,7 +1138,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_OEM_HOOK_STRINGS, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeStringArray(strings);
@@ -1160,7 +1160,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(bandMode);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " " + bandMode);
 
 //     RILREQUEST::send(rr);
@@ -1179,7 +1179,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE,
 //                                         response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1194,7 +1194,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RILConstants.RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeString(contents);
@@ -1210,7 +1210,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RILConstants.RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     rr.mp.writeString(contents);
@@ -1226,7 +1226,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RILConstants.RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ '[' + contents + ']');
 
 //     rr.mp.writeString(contents);
@@ -1245,7 +1245,7 @@ void getSignalStrength(RilResponse *result)
 //         RILConstants.RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM,
 //         response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     int[] param = new int[1];
@@ -1259,7 +1259,7 @@ void getSignalStrength(RilResponse *result)
 //      */
 // void setCurrentPreferredNetworkType()
 // {
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         riljLog("setCurrentPreferredNetworkType: " + mSetPreferredNetworkType);
 //     setPreferredNetworkType(mSetPreferredNetworkType, null);
 // }
@@ -1281,7 +1281,7 @@ void getSignalStrength(RilResponse *result)
 //     mSetPreferredNetworkType = networkType;
 //     mPreferredNetworkType = networkType;
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + networkType);
 
 //     RILREQUEST::send(rr);
@@ -1296,7 +1296,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RILConstants.RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1311,7 +1311,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RILConstants.RIL_REQUEST_GET_NEIGHBORING_CELL_IDS, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1327,7 +1327,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(enable ? 1 : 0);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ ": " + enable);
 
 //     RILREQUEST::send(rr);
@@ -1341,7 +1341,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_GET_SMSC_ADDRESS, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1357,7 +1357,7 @@ void getSignalStrength(RilResponse *result)
 
 //     rr.mp.writeString(address);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + address);
 
 //     RILREQUEST::send(rr);
@@ -1373,7 +1373,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(available ? 1 : 0);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ ": " + available);
 
 //     RILREQUEST::send(rr);
@@ -1387,7 +1387,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING, result);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1401,7 +1401,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_GSM_GET_BROADCAST_CONFIG, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1427,7 +1427,7 @@ void getSignalStrength(RilResponse *result)
 //         rr.mp.writeInt(config[i].isSelected() ? 1 : 0);
 //     }
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //     {
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " with " + numOfConfig + " configs : ");
 //         for (int i = 0; i < numOfConfig; i++)
@@ -1450,7 +1450,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(activate ? 0 : 1);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -1465,7 +1465,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(on ? 1 : 0);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ ": " + on);
 
 //     RILREQUEST::send(rr);
@@ -1592,7 +1592,7 @@ void getSignalStrength(RilResponse *result)
 // }
 
 // private
-// void processResponse(Parcel p)
+// void processResponse(Parcel &p)
 // {
 //     int type;
 
@@ -1622,7 +1622,7 @@ void getSignalStrength(RilResponse *result)
 //     synchronized(mRequestsList)
 //     {
 //         int count = mRequestsList.size();
-//         if (VERBOSE && loggable)
+//         if (RIL_VERBOSE && loggable)
 //         {
 //             Log.d(LOG_TAG, "WAKE_LOCK_TIMEOUT " +
 //                                " mReqPending=" + mRequestMessagesPending +
@@ -1632,7 +1632,7 @@ void getSignalStrength(RilResponse *result)
 //         for (int i = 0; i < count; i++)
 //         {
 //             rr = mRequestsList.get(i);
-//             if (VERBOSE && loggable)
+//             if (RIL_VERBOSE && loggable)
 //             {
 //                 Log.d(LOG_TAG, i + ": [" + rr.mSerial + "] " +
 //                                    requestToString(rr.mRequest));
@@ -1668,7 +1668,7 @@ void getSignalStrength(RilResponse *result)
 // }
 
 // private
-// void processSolicited(Parcel p)
+// void processSolicited(Parcel &p)
 // {
 //     int serial, error;
 //     boolean found = false;
@@ -2049,7 +2049,7 @@ void getSignalStrength(RilResponse *result)
 //         return;
 //     }
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "< " << rr->requestToString() << ENDL+ " " + retToString(rr.mRequest, ret));
 
 //     if (rr.mResult != null)
@@ -2146,7 +2146,7 @@ void getSignalStrength(RilResponse *result)
 // }
 
 // private
-// void processUnsolicited(Parcel p)
+// void processUnsolicited(Parcel &p)
 // {
 //     int response;
 //     Object ret;
@@ -2283,20 +2283,20 @@ void getSignalStrength(RilResponse *result)
 //     case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED:
 //         /* has bonus radio state int */
 //         RadioState newState = getRadioStateFromInt(p.readInt());
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogMore(response, newState.toString());
 
 //         switchToRadioState(newState);
 //         break;
 //     case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         mCallStateRegistrants
 //             .notifyRegistrants(new AsyncResult(null, null, null));
 //         break;
 //     case RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         mVoiceNetworkStateRegistrants
@@ -2304,7 +2304,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 //     case RIL_UNSOL_RESPONSE_NEW_SMS:
 //     {
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         // FIXME this should move up a layer
@@ -2323,7 +2323,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 //     }
 //     case RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mSmsStatusRegistrant != null)
@@ -2333,7 +2333,7 @@ void getSignalStrength(RilResponse *result)
 //         }
 //         break;
 //     case RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         int[] smsIndex = (int[])ret;
@@ -2347,7 +2347,7 @@ void getSignalStrength(RilResponse *result)
 //         }
 //         else
 //         {
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 riljLog(" NEW_SMS_ON_SIM ERROR with wrong length " + smsIndex.length);
 //         }
 //         break;
@@ -2360,7 +2360,7 @@ void getSignalStrength(RilResponse *result)
 //             resp[0] = ((String[])ret)[0];
 //             resp[1] = null;
 //         }
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogMore(response, resp[0]);
 //         if (mUSSDRegistrant != null)
 //         {
@@ -2369,7 +2369,7 @@ void getSignalStrength(RilResponse *result)
 //         }
 //         break;
 //     case RIL_UNSOL_NITZ_TIME_RECEIVED:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         // has bonus long containing milliseconds since boot that the NITZ
@@ -2407,14 +2407,14 @@ void getSignalStrength(RilResponse *result)
 //         }
 //         break;
 //     case RIL_UNSOL_DATA_CALL_LIST_CHANGED:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         mDataNetworkStateRegistrants.notifyRegistrants(new AsyncResult(null, ret, null));
 //         break;
 
 //     case RIL_UNSOL_SUPP_SVC_NOTIFICATION:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mSsnRegistrant != null)
@@ -2425,7 +2425,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_STK_SESSION_END:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         if (mCatSessionEndRegistrant != null)
@@ -2436,7 +2436,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_STK_PROACTIVE_COMMAND:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mCatProCmdRegistrant != null)
@@ -2447,7 +2447,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_STK_EVENT_NOTIFY:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mCatEventRegistrant != null)
@@ -2458,7 +2458,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_STK_CALL_SETUP:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mCatCallSetUpRegistrant != null)
@@ -2469,7 +2469,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_SIM_SMS_STORAGE_FULL:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         if (mIccSmsFullRegistrant != null)
@@ -2479,7 +2479,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_SIM_REFRESH:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mIccRefreshRegistrants != null)
@@ -2490,7 +2490,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_CALL_RING:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mRingRegistrant != null)
@@ -2501,7 +2501,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_RESTRICTED_STATE_CHANGED:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogvRet(response, ret);
 //         if (mRestrictedStateRegistrant != null)
 //         {
@@ -2511,7 +2511,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         if (mIccStatusChangedRegistrants != null)
@@ -2521,7 +2521,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_RESPONSE_CDMA_NEW_SMS:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         SmsMessage sms = (SmsMessage)ret;
@@ -2534,7 +2534,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_RESPONSE_NEW_BROADCAST_SMS:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         if (mGsmBroadcastSmsRegistrant != null)
@@ -2545,7 +2545,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_CDMA_RUIM_SMS_STORAGE_FULL:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         if (mIccSmsFullRegistrant != null)
@@ -2555,7 +2555,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_ENTER_EMERGENCY_CALLBACK_MODE:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLog(response);
 
 //         if (mEmergencyCallbackModeRegistrant != null)
@@ -2565,7 +2565,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_CDMA_CALL_WAITING:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mCallWaitingInfoRegistrants != null)
@@ -2576,7 +2576,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_CDMA_OTA_PROVISION_STATUS:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mOtaProvisionRegistrants != null)
@@ -2601,14 +2601,14 @@ void getSignalStrength(RilResponse *result)
 
 //         for (CdmaInformationRecords rec : listInfoRecs)
 //         {
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 unsljLogRet(response, rec);
 //             notifyRegistrantsCdmaInfoRec(rec);
 //         }
 //         break;
 
 //     case RIL_UNSOL_OEM_HOOK_RAW:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogvRet(response, IccUtils.bytesToHexString((byte[])ret));
 //         if (mUnsolOemHookRawRegistrant != null)
 //         {
@@ -2617,7 +2617,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_RINGBACK_TONE:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogvRet(response, ret);
 //         if (mRingbackToneRegistrants != null)
 //         {
@@ -2628,7 +2628,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_RESEND_INCALL_MUTE:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mResendIncallMuteRegistrants != null)
@@ -2639,7 +2639,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mCdmaSubscriptionChangedRegistrants != null)
@@ -2650,7 +2650,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOl_CDMA_PRL_CHANGED:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mCdmaPrlChangedRegistrants != null)
@@ -2661,7 +2661,7 @@ void getSignalStrength(RilResponse *result)
 //         break;
 
 //     case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE:
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         if (mExitEmergencyCallbackModeRegistrants != null)
@@ -2673,7 +2673,7 @@ void getSignalStrength(RilResponse *result)
 
 //     case RIL_UNSOL_RIL_CONNECTED:
 //     {
-//         if (VERBOSE)
+//         if (RIL_VERBOSE)
 //             unsljLogRet(response, ret);
 
 //         // Initial conditions
@@ -2704,7 +2704,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseInts(Parcel p)
+// responseInts(Parcel &p)
 // {
 //     int numInts;
 //     int response[];
@@ -2723,14 +2723,14 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseVoid(Parcel p)
+// responseVoid(Parcel &p)
 // {
 //     return null;
 // }
 
 // private
 // Object
-// responseCallForward(Parcel p)
+// responseCallForward(Parcel &p)
 // {
 //     int numInfos;
 //     CallForwardInfo infos[];
@@ -2756,7 +2756,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseSuppServiceNotification(Parcel p)
+// responseSuppServiceNotification(Parcel &p)
 // {
 //     SuppServiceNotification notification = new SuppServiceNotification();
 
@@ -2771,7 +2771,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseCdmaSms(Parcel p)
+// responseCdmaSms(Parcel &p)
 // {
 //     SmsMessage sms;
 //     sms = SmsMessage.newFromParcel(p);
@@ -2781,7 +2781,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseString(Parcel p)
+// responseString(Parcel &p)
 // {
 //     String response;
 
@@ -2792,7 +2792,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseStrings(Parcel p)
+// responseStrings(Parcel &p)
 // {
 //     int num;
 //     String response[];
@@ -2815,7 +2815,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseRaw(Parcel p)
+// responseRaw(Parcel &p)
 // {
 //     int num;
 //     byte response[];
@@ -2827,7 +2827,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseSMS(Parcel p)
+// responseSMS(Parcel &p)
 // {
 //     int messageRef, errorCode;
 //     String ackPDU;
@@ -2843,7 +2843,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseICC_IO(Parcel p)
+// responseICC_IO(Parcel &p)
 // {
 //     int sw1, sw2;
 //     byte data[] = null;
@@ -2862,7 +2862,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseIccCardStatus(Parcel p)
+// responseIccCardStatus(Parcel &p)
 // {
 //     IccCardApplication ca;
 
@@ -2899,7 +2899,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseCallList(Parcel p)
+// responseCallList(Parcel &p)
 // {
 //     int num;
 //     int voiceSettings;
@@ -2969,7 +2969,7 @@ void getSignalStrength(RilResponse *result)
 // }
 
 // private
-// DataCallState getDataCallState(Parcel p, int version)
+// DataCallState getDataCallState(Parcel &p, int version)
 // {
 //     DataCallState dataCall = new DataCallState();
 
@@ -3019,7 +3019,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseDataCallList(Parcel p)
+// responseDataCallList(Parcel &p)
 // {
 //     ArrayList<DataCallState> response;
 
@@ -3038,7 +3038,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseSetupDataCall(Parcel p)
+// responseSetupDataCall(Parcel &p)
 // {
 //     int ver = p.readInt();
 //     int num = p.readInt();
@@ -3066,7 +3066,7 @@ void getSignalStrength(RilResponse *result)
 //         if (num >= 4)
 //         {
 //             String dnses = p.readString();
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 riljLog("responseSetupDataCall got dnses=" + dnses);
 //             if (!TextUtils.isEmpty(dnses))
 //             {
@@ -3076,7 +3076,7 @@ void getSignalStrength(RilResponse *result)
 //         if (num >= 5)
 //         {
 //             String gateways = p.readString();
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 riljLog("responseSetupDataCall got gateways=" + gateways);
 //             if (!TextUtils.isEmpty(gateways))
 //             {
@@ -3099,7 +3099,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseOperatorInfos(Parcel p)
+// responseOperatorInfos(Parcel &p)
 // {
 //     String strings[] = (String[])responseStrings(p);
 //     ArrayList<OperatorInfo> ret;
@@ -3127,7 +3127,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseCellList(Parcel p)
+// responseCellList(Parcel &p)
 // {
 //     int num, rssi;
 //     String location;
@@ -3185,7 +3185,7 @@ void getSignalStrength(RilResponse *result)
 // }
 
 // private
-// Object responseGetPreferredNetworkType(Parcel p)
+// Object responseGetPreferredNetworkType(Parcel &p)
 // {
 //     int[] response = (int[])responseInts(p);
 
@@ -3200,7 +3200,7 @@ void getSignalStrength(RilResponse *result)
 // }
 
 // private
-// Object responseGmsBroadcastConfig(Parcel p)
+// Object responseGmsBroadcastConfig(Parcel &p)
 // {
 //     int num;
 //     ArrayList<SmsBroadcastConfigInfo> response;
@@ -3226,7 +3226,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseCdmaBroadcastConfig(Parcel p)
+// responseCdmaBroadcastConfig(Parcel &p)
 // {
 //     int numServiceCategories;
 //     int response[];
@@ -3270,26 +3270,22 @@ void getSignalStrength(RilResponse *result)
 //     return response;
 // }
 
-// private
-// Object
-// responseSignalStrength(Parcel p)
-// {
-//     int numInts = 12;
-//     int response[];
+void responseSignalStrength(Parcel &p)
+{
+    int numInts = 12;
+    std::vector<int> vec;
 
-//     /* TODO: Add SignalStrength class to match RIL_SignalStrength */
-//     response = new int[numInts];
-//     for (int i = 0; i < numInts; i++)
-//     {
-//         response[i] = p.readInt();
-//     }
-
-//     return response;
-// }
+    /* TODO: Add SignalStrength class to match RIL_SignalStrength */
+    for (int i = 0; i < numInts; i++)
+    {
+        vec.emplace_back(p.readInt());
+        LOGI << vec[i] << ENDL;
+    }
+}
 
 // private
 // ArrayList<CdmaInformationRecords>
-// responseCdmaInformationRecord(Parcel p)
+// responseCdmaInformationRecord(Parcel &p)
 // {
 //     int numberOfInfoRecs;
 //     ArrayList<CdmaInformationRecords> response;
@@ -3312,7 +3308,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseCdmaCallWaiting(Parcel p)
+// responseCdmaCallWaiting(Parcel &p)
 // {
 //     CdmaCallWaitingNotification notification = new CdmaCallWaitingNotification();
 
@@ -3332,7 +3328,7 @@ void getSignalStrength(RilResponse *result)
 
 // private
 // Object
-// responseCallRing(Parcel p)
+// responseCallRing(Parcel &p)
 // {
 //     char response[] = new char[4];
 
@@ -3352,7 +3348,7 @@ void getSignalStrength(RilResponse *result)
 //     {
 //         if (mDisplayInfoRegistrants != null)
 //         {
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 unsljLogRet(response, infoRec.record);
 //             mDisplayInfoRegistrants.notifyRegistrants(
 //                 new AsyncResult(null, infoRec.record, null));
@@ -3362,7 +3358,7 @@ void getSignalStrength(RilResponse *result)
 //     {
 //         if (mSignalInfoRegistrants != null)
 //         {
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 unsljLogRet(response, infoRec.record);
 //             mSignalInfoRegistrants.notifyRegistrants(
 //                 new AsyncResult(null, infoRec.record, null));
@@ -3372,7 +3368,7 @@ void getSignalStrength(RilResponse *result)
 //     {
 //         if (mNumberInfoRegistrants != null)
 //         {
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 unsljLogRet(response, infoRec.record);
 //             mNumberInfoRegistrants.notifyRegistrants(
 //                 new AsyncResult(null, infoRec.record, null));
@@ -3382,7 +3378,7 @@ void getSignalStrength(RilResponse *result)
 //     {
 //         if (mRedirNumInfoRegistrants != null)
 //         {
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 unsljLogRet(response, infoRec.record);
 //             mRedirNumInfoRegistrants.notifyRegistrants(
 //                 new AsyncResult(null, infoRec.record, null));
@@ -3392,7 +3388,7 @@ void getSignalStrength(RilResponse *result)
 //     {
 //         if (mLineControlInfoRegistrants != null)
 //         {
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 unsljLogRet(response, infoRec.record);
 //             mLineControlInfoRegistrants.notifyRegistrants(
 //                 new AsyncResult(null, infoRec.record, null));
@@ -3402,7 +3398,7 @@ void getSignalStrength(RilResponse *result)
 //     {
 //         if (mT53ClirInfoRegistrants != null)
 //         {
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 unsljLogRet(response, infoRec.record);
 //             mT53ClirInfoRegistrants.notifyRegistrants(
 //                 new AsyncResult(null, infoRec.record, null));
@@ -3412,7 +3408,7 @@ void getSignalStrength(RilResponse *result)
 //     {
 //         if (mT53AudCntrlInfoRegistrants != null)
 //         {
-//             if (VERBOSE)
+//             if (RIL_VERBOSE)
 //                 unsljLogRet(response, infoRec.record);
 //             mT53AudCntrlInfoRegistrants.notifyRegistrants(
 //                 new AsyncResult(null, infoRec.record, null));
@@ -3776,7 +3772,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_DEVICE_IDENTITY, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -3787,7 +3783,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CDMA_SUBSCRIPTION, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -3795,7 +3791,7 @@ void getSignalStrength(RilResponse *result)
 
 // void setPhoneType(int phoneType)
 // { // Called by CDMAPhone and GSMPhone constructor
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         riljLog("setPhoneType=" + phoneType + " old value=" + mPhoneType);
 //     mPhoneType = phoneType;
 // }
@@ -3809,7 +3805,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RILConstants.RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -3827,7 +3823,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(cdmaRoamingType);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + cdmaRoamingType);
 
 //     RILREQUEST::send(rr);
@@ -3845,7 +3841,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(cdmaSubscription);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + cdmaSubscription);
 
 //     RILREQUEST::send(rr);
@@ -3859,7 +3855,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RILConstants.RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -3874,7 +3870,7 @@ void getSignalStrength(RilResponse *result)
 //     RilRequest *rr = RILREQUEST::obtain(
 //         RILConstants.RIL_REQUEST_QUERY_TTY_MODE, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -3892,7 +3888,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(ttyMode);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + ttyMode);
 
 //     RILREQUEST::send(rr);
@@ -3908,7 +3904,7 @@ void getSignalStrength(RilResponse *result)
 
 //     rr.mp.writeString(FeatureCode);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + FeatureCode);
 
 //     RILREQUEST::send(rr);
@@ -3933,7 +3929,7 @@ void getSignalStrength(RilResponse *result)
 //         rr.mp.writeInt(configValuesArray[i]);
 //     }
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -3947,7 +3943,7 @@ void getSignalStrength(RilResponse *result)
 //     rr.mp.writeInt(1);
 //     rr.mp.writeInt(activate ? 0 : 1);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -3961,7 +3957,7 @@ void getSignalStrength(RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE, response);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);
@@ -3974,7 +3970,7 @@ void getSignalStrength(RilResponse *result)
 
 //     rr.mp.writeString(nonce);
 
-//     if (VERBOSE)
+//     if (RIL_VERBOSE)
 //         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
 //     RILREQUEST::send(rr);

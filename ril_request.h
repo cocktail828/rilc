@@ -25,6 +25,7 @@ public:
 
 private:
     /* instance variables */
+    RilResponse *mResponse;
     int mRequestId;
     int mCommandId;
 
