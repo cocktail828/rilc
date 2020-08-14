@@ -44,11 +44,13 @@ void poolRead(DeviceManager *args)
                 // serial closed?
                 if (events[i].events & EPOLLRDHUP)
                 {
+                    LOGW << "peer close device" << ENDL;
                     break;
                 }
 
                 if (events[i].events & (EPOLLERR | EPOLLHUP))
                 {
+                    LOGW << "epoll error, event = " << events[i].events << ENDL;
                     break;
                 }
 
@@ -122,7 +124,7 @@ bool DeviceManager::openDevice()
         fd = open_tty(mDevice.c_str());
     else
         fd = open_unix_sock(mDevice.c_str());
-    
+
     if (fd < 0)
         return false;
 
@@ -174,12 +176,21 @@ bool DeviceManager::recvAsync(void *data, int len, int *olen)
     if (!mReady)
         return false;
 
+    auto dum_msg = [&]() {
+        uint8_t *ptr = reinterpret_cast<uint8_t *>(data);
+        static char _msg[8 * 1024];
+        memset(_msg, 0, sizeof(_msg));
+        for (int i = 0; i < len; i++)
+            snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
+
+        LOGI << "dump_msg: " << _msg << ENDL;
+    };
+
     ssize_t ret = read(mHandle, data, len);
     if (ret < 0)
-    {
         return false;
-    }
 
+    dum_msg();
     if (olen)
         *olen = ret;
     return true;

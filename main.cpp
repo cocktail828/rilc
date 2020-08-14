@@ -10,15 +10,16 @@
 
 int main()
 {
-    Logger::Init("main", Severity::DEBUG, true);
     LOGFI("main1");
-    LOGE << "an error" << ENDL;
-    // RILC_init("/dev/ttyUSB0");
-    // LOGFI("main2");
+    RILC_init("/dev/ttyUSB4");
+    LOGFI("main2");
 
-    // std::this_thread::sleep_for(std::chrono::seconds(3));
-    // RILC_uninit();
-    // LOGFI("main3");
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    RILC_requestIMSI();
+
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    RILC_uninit();
+    LOGFI("main3");
 
     return 0;
 }

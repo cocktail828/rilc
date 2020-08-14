@@ -29,7 +29,7 @@ int RILC_init(const char *device)
         std::this_thread::sleep_for(std::chrono::seconds(3));
     }
     RILREQUEST::mGlobalLock.unlock();
-    LOGI << "seccussfully " << ENDL;
+    LOGI << "init seccussfully " << ENDL;
     return 0;
 }
 
@@ -46,8 +46,12 @@ int RILC_uninit()
     return ret;
 }
 
-int RILC_requestSignalStrength(void *)
+int RILC_requestIMSI()
 {
+    RilRequest *req = new RilRequest();
+
+    req->getIMSI(new RilResponse());
+
     return 0;
 }
 

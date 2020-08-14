@@ -13,7 +13,15 @@ std::mutex RilRequest::mGlobalLock;
 
 RilRequest *RilRequest::obtain(int cid, RilResponse *result)
 {
-    RilRequest *rr = new RilRequest();
+    RilRequest *rr = new (std::nothrow) RilRequest();
+
+    rr->mRequestId = rr->mGlobalRequestId++;
+    rr->mCommandId = cid;
+    rr->mResponse = result;
+
+    rr->mParcel.writeInt(cid);
+    rr->mParcel.writeInt(rr->mRequestId);
+
     return rr;
 }
 
@@ -48,6 +56,7 @@ bool RilRequest::uninit()
             return true;
         }
     }
+
     return false;
 }
 
@@ -63,12 +72,28 @@ void RilRequest::resetRequest()
     mGlobalRequestId = 0;
 }
 
-void RilRequest::send(RilRequest *)
+void RilRequest::send(RilRequest *rr)
 {
+    auto dum_msg = [&]() {
+        const uint8_t *ptr = rr->mParcel.data();
+        static char _msg[8 * 1024];
+        memset(_msg, 0, sizeof(_msg));
+        for (int i = 0; i < rr->mParcel.dataSize(); i++)
+            snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
+
+        LOGI << "dump_msg: " << _msg << ENDL;
+    };
+
     if (mDeviceMgr && mDeviceMgr->isReady())
     {
+        dum_msg();
         mDeviceMgr->sendAsync(reinterpret_cast<const void *>(mParcel.data()),
                               mParcel.dataSize());
+        mDeviceMgr->attach(this);
+    }
+    else
+    {
+        LOGE << "device is not ready" << ENDL;
     }
 }
 
@@ -78,6 +103,11 @@ RilRequest::RilRequest()
 
 RilRequest::~RilRequest()
 {
+    if (mResponse)
+    {
+        delete mResponse;
+        mResponse = nullptr;
+    }
 }
 
 /* When get some message from requestid, this function will be called */
@@ -105,7 +135,7 @@ void RilRequest::update(void *_arg)
 
 std::string RilRequest::serialString()
 {
-    return "";
+    return std::to_string(mRequestId);
 }
 
 int RilRequest::get_requestid()
@@ -120,7 +150,7 @@ int RilRequest::get_commandid()
 
 std::string RilRequest::requestToString()
 {
-    switch (mRequestId)
+    switch (mCommandId)
     {
     case RIL_REQUEST_GET_SIM_STATUS:
         return "GET_SIM_STATUS";
@@ -346,7 +376,8 @@ void RilRequest::getIccCardStatus(RilResponse *result)
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_SIM_STATUS, result);
+        RIL_REQUEST_GET_SIM_STATUS,
+        result);
 
     LOGV << rr->serialString() << "> " << rr->requestToString() << ENDL;
     RILREQUEST::send(rr);
@@ -355,7 +386,8 @@ void RilRequest::getIccCardStatus(RilResponse *result)
 
 void RilRequest::supplyIccPin(std::string pin, RilResponse *result)
 {
-    supplyIccPinForApp(pin, "", result);
+    supplyIccPinForApp(pin, "",
+                       result);
 }
 
 void RilRequest::supplyIccPinForApp(std::string pin, std::string aid, RilResponse *result)
@@ -363,7 +395,8 @@ void RilRequest::supplyIccPinForApp(std::string pin, std::string aid, RilRespons
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_SIM_PIN, result);
+        RIL_REQUEST_ENTER_SIM_PIN,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -377,7 +410,8 @@ void RilRequest::supplyIccPinForApp(std::string pin, std::string aid, RilRespons
 
 void RilRequest::supplyIccPuk(std::string puk, std::string newPin, RilResponse *result)
 {
-    supplyIccPukForApp(puk, newPin, "", result);
+    supplyIccPukForApp(puk, newPin, "",
+                       result);
 }
 
 void RilRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::string aid, RilResponse *result)
@@ -385,7 +419,8 @@ void RilRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::st
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_SIM_PUK, result);
+        RIL_REQUEST_ENTER_SIM_PUK,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -400,7 +435,8 @@ void RilRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::st
 
 void RilRequest::supplyIccPin2(std::string pin, RilResponse *result)
 {
-    supplyIccPin2ForApp(pin, "", result);
+    supplyIccPin2ForApp(pin, "",
+                        result);
 }
 
 void RilRequest::supplyIccPin2ForApp(std::string pin, std::string aid, RilResponse *result)
@@ -408,7 +444,8 @@ void RilRequest::supplyIccPin2ForApp(std::string pin, std::string aid, RilRespon
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_SIM_PIN2, result);
+        RIL_REQUEST_ENTER_SIM_PIN2,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -422,7 +459,8 @@ void RilRequest::supplyIccPin2ForApp(std::string pin, std::string aid, RilRespon
 
 void RilRequest::supplyIccPuk2(std::string puk2, std::string newPin2, RilResponse *result)
 {
-    supplyIccPuk2ForApp(puk2, newPin2, "", result);
+    supplyIccPuk2ForApp(puk2, newPin2, "",
+                        result);
 }
 
 void RilRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid, RilResponse *result)
@@ -430,7 +468,8 @@ void RilRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_SIM_PUK2, result);
+        RIL_REQUEST_ENTER_SIM_PUK2,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -445,7 +484,8 @@ void RilRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::
 
 void RilRequest::changeIccPin(std::string oldPin, std::string newPin, RilResponse *result)
 {
-    changeIccPinForApp(oldPin, newPin, "", result);
+    changeIccPinForApp(oldPin, newPin, "",
+                       result);
 }
 
 void RilRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid, RilResponse *result)
@@ -453,7 +493,8 @@ void RilRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std:
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CHANGE_SIM_PIN, result);
+        RIL_REQUEST_CHANGE_SIM_PIN,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -468,7 +509,8 @@ void RilRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std:
 
 void RilRequest::changeIccPin2(std::string oldPin2, std::string newPin2, RilResponse *result)
 {
-    changeIccPin2ForApp(oldPin2, newPin2, "", result);
+    changeIccPin2ForApp(oldPin2, newPin2, "",
+                        result);
 }
 
 void RilRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid, RilResponse *result)
@@ -476,7 +518,8 @@ void RilRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, s
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CHANGE_SIM_PIN2, result);
+        RIL_REQUEST_CHANGE_SIM_PIN2,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -492,7 +535,8 @@ void RilRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, s
 void RilRequest::changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CHANGE_BARRING_PASSWORD, result);
+        RIL_REQUEST_CHANGE_BARRING_PASSWORD,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -508,7 +552,8 @@ void RilRequest::changeBarringPassword(std::string facility, std::string oldPwd,
 void RilRequest::supplyNetworkDepersonalization(std::string netpin, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION, result);
+        RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -522,7 +567,8 @@ void RilRequest::supplyNetworkDepersonalization(std::string netpin, RilResponse 
 void RilRequest::getCurrentCalls(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_CURRENT_CALLS, result);
+        RIL_REQUEST_GET_CURRENT_CALLS,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -538,7 +584,8 @@ __attribute_deprecated__ void RilRequest::getPDPContextList(RilResponse *result)
 void RilRequest::getDataCallList(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DATA_CALL_LIST, result);
+        RIL_REQUEST_DATA_CALL_LIST,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -581,7 +628,8 @@ void RilRequest::getDataCallList(RilResponse *result)
 void RilRequest::getIMSI(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_IMSI, result);
+        RIL_REQUEST_GET_IMSI,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -592,7 +640,8 @@ void RilRequest::getIMSI(RilResponse *result)
 void RilRequest::getIMEI(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_IMEI, result);
+        RIL_REQUEST_GET_IMEI,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -603,7 +652,8 @@ void RilRequest::getIMEI(RilResponse *result)
 void RilRequest::getIMEISV(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_IMEISV, result);
+        RIL_REQUEST_GET_IMEISV,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -616,7 +666,8 @@ void RilRequest::hangupConnection(int gsmIndex, RilResponse *result)
     LOGFW("hangupConnection: gsmIndex = ", gsmIndex);
 
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_HANGUP, result);
+        RIL_REQUEST_HANGUP,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << gsmIndex << ENDL;
 
@@ -666,7 +717,8 @@ void RilRequest::switchWaitingOrHoldingAndActive(RilResponse *result)
 void RilRequest::conference(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CONFERENCE, result);
+        RIL_REQUEST_CONFERENCE,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -699,7 +751,8 @@ void RilRequest::getPreferredVoicePrivacy(RilResponse *result)
 void RilRequest::separateConnection(int gsmIndex, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SEPARATE_CONNECTION, result);
+        RIL_REQUEST_SEPARATE_CONNECTION,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << gsmIndex << ENDL;
 
@@ -713,7 +766,8 @@ void RilRequest::separateConnection(int gsmIndex, RilResponse *result)
 void RilRequest::acceptCall(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ANSWER, result);
+        RIL_REQUEST_ANSWER,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -724,7 +778,8 @@ void RilRequest::acceptCall(RilResponse *result)
 void RilRequest::rejectCall(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_UDUB, result);
+        RIL_REQUEST_UDUB,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -735,7 +790,8 @@ void RilRequest::rejectCall(RilResponse *result)
 void RilRequest::explicitCallTransfer(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_EXPLICIT_CALL_TRANSFER, result);
+        RIL_REQUEST_EXPLICIT_CALL_TRANSFER,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -746,7 +802,8 @@ void RilRequest::explicitCallTransfer(RilResponse *result)
 void RilRequest::getLastCallFailCause(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_LAST_CALL_FAIL_CAUSE, result);
+        RIL_REQUEST_LAST_CALL_FAIL_CAUSE,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -760,12 +817,13 @@ __attribute_deprecated__ void RilRequest::getLastPdpFailCause(RilResponse *resul
 }
 
 /**
- * The preferred new alternative to getLastPdpFailCause
+ * The preferred new(std::nothrow) alternative to getLastPdpFailCause
  */
 void RilRequest::getLastDataCallFailCause(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE, result);
+        RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -776,7 +834,8 @@ void RilRequest::getLastDataCallFailCause(RilResponse *result)
 void RilRequest::setMute(bool enableMute, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_MUTE, result);
+        RIL_REQUEST_SET_MUTE,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << enableMute << ENDL;
 
@@ -790,7 +849,8 @@ void RilRequest::setMute(bool enableMute, RilResponse *result)
 void RilRequest::getMute(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_MUTE, result);
+        RIL_REQUEST_GET_MUTE,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -801,7 +861,8 @@ void RilRequest::getMute(RilResponse *result)
 void RilRequest::getSignalStrength(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SIGNAL_STRENGTH, result);
+        RIL_REQUEST_SIGNAL_STRENGTH,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -812,7 +873,8 @@ void RilRequest::getSignalStrength(RilResponse *result)
 void RilRequest::getVoiceRegistrationState(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_VOICE_REGISTRATION_STATE, result);
+        RIL_REQUEST_VOICE_REGISTRATION_STATE,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -823,7 +885,8 @@ void RilRequest::getVoiceRegistrationState(RilResponse *result)
 void RilRequest::getDataRegistrationState(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DATA_REGISTRATION_STATE, result);
+        RIL_REQUEST_DATA_REGISTRATION_STATE,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -833,7 +896,8 @@ void RilRequest::getDataRegistrationState(RilResponse *result)
 void RilRequest::getOperator(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_OPERATOR, result);
+        RIL_REQUEST_OPERATOR,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -844,7 +908,8 @@ void RilRequest::getOperator(RilResponse *result)
 void RilRequest::sendDtmf(char c, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DTMF, result);
+        RIL_REQUEST_DTMF,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -857,7 +922,8 @@ void RilRequest::sendDtmf(char c, RilResponse *result)
 void RilRequest::startDtmf(char c, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DTMF_START, result);
+        RIL_REQUEST_DTMF_START,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -870,7 +936,8 @@ void RilRequest::startDtmf(char c, RilResponse *result)
 void RilRequest::stopDtmf(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DTMF_STOP, result);
+        RIL_REQUEST_DTMF_STOP,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -881,7 +948,8 @@ void RilRequest::stopDtmf(RilResponse *result)
 void RilRequest::sendBurstDtmf(std::string dtmfString, int on, int off, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CDMA_BURST_DTMF, result);
+        RIL_REQUEST_CDMA_BURST_DTMF,
+        result);
 
     rr->mParcel.writeInt(3);
     rr->mParcel.writeString(dtmfString.c_str());
@@ -897,7 +965,8 @@ void RilRequest::sendBurstDtmf(std::string dtmfString, int on, int off, RilRespo
 void RilRequest::sendSMS(std::string smscPDU, std::string pdu, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SEND_SMS, result);
+        RIL_REQUEST_SEND_SMS,
+        result);
 
     rr->mParcel.writeInt(2);
     rr->mParcel.writeString(smscPDU.c_str());
@@ -914,11 +983,12 @@ void RilRequest::sendSMS(std::string smscPDU, std::string pdu, RilResponse *resu
 //     int address_nbr_of_digits;
 //     int subaddr_nbr_of_digits;
 //     int bearerDataLength;
-//     ByteArrayInputStream bais = new ByteArrayInputStream(pdu);
-//     DataInputStream dis = new DataInputStream(bais);
+//     ByteArrayInputStream bais = new(std::nothrow) ByteArrayInputStream(pdu);
+//     DataInputStream dis = new(std::nothrow) DataInputStream(bais);
 
 //     RilRequest *rr = RILREQUEST::obtain(
-//            RIL_REQUEST_CDMA_SEND_SMS, result);
+//            RIL_REQUEST_CDMA_SEND_SMS,
+//            result);
 
 //     try
 //     {
@@ -1069,7 +1139,8 @@ void RilRequest::setupDataCall(std::string radioTechnology, std::string profile,
                                RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SETUP_DATA_CALL, result);
+        RIL_REQUEST_SETUP_DATA_CALL,
+        result);
 
     rr->mParcel.writeInt(7);
 
@@ -1092,7 +1163,8 @@ void RilRequest::setupDataCall(std::string radioTechnology, std::string profile,
 void RilRequest::deactivateDataCall(int cid, int reason, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DEACTIVATE_DATA_CALL, result);
+        RIL_REQUEST_DEACTIVATE_DATA_CALL,
+        result);
 
     rr->mParcel.writeInt(2);
     rr->mParcel.writeString(std::to_string(cid).c_str());
@@ -1107,7 +1179,8 @@ void RilRequest::deactivateDataCall(int cid, int reason, RilResponse *result)
 void RilRequest::setRadioPower(bool on, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_RADIO_POWER, result);
+        RIL_REQUEST_RADIO_POWER,
+        result);
 
     rr->mParcel.writeInt(1);
     rr->mParcel.writeInt(on ? 1 : 0);
@@ -1121,7 +1194,8 @@ void RilRequest::setRadioPower(bool on, RilResponse *result)
 void RilRequest::setSuppServiceNotifications(bool enable, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION, result);
+        RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION,
+        result);
 
     rr->mParcel.writeInt(1);
     rr->mParcel.writeInt(enable ? 1 : 0);
@@ -1135,7 +1209,8 @@ void RilRequest::setSuppServiceNotifications(bool enable, RilResponse *result)
 void RilRequest::acknowledgeLastIncomingGsmSms(bool success, int cause, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SMS_ACKNOWLEDGE, result);
+        RIL_REQUEST_SMS_ACKNOWLEDGE,
+        result);
 
     rr->mParcel.writeInt(2);
     rr->mParcel.writeInt(success ? 1 : 0);
@@ -1150,7 +1225,8 @@ void RilRequest::acknowledgeLastIncomingGsmSms(bool success, int cause, RilRespo
 void RilRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE, result);
+        RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE,
+        result);
 
     rr->mParcel.writeInt(success ? 0 : 1); //RIL_CDMA_SMS_ErrorClass
     // cause code according to X.S004-550E
@@ -1165,7 +1241,8 @@ void RilRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause, RilResp
 void RilRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU, result);
+        RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU,
+        result);
 
     rr->mParcel.writeInt(2);
     rr->mParcel.writeString(success ? "1" : "0");
@@ -1183,7 +1260,8 @@ void RilRequest::iccIO(int command, int fileid, std::string path, int p1, int p2
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SIM_IO, result);
+        RIL_REQUEST_SIM_IO,
+        result);
 
     rr->mParcel.writeInt(command);
     rr->mParcel.writeInt(fileid);
@@ -1205,7 +1283,8 @@ void RilRequest::iccIO(int command, int fileid, std::string path, int p1, int p2
 void RilRequest::getCLIR(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_CLIR, result);
+        RIL_REQUEST_GET_CLIR,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1216,7 +1295,8 @@ void RilRequest::getCLIR(RilResponse *result)
 void RilRequest::setCLIR(int clirMode, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_CLIR, result);
+        RIL_REQUEST_SET_CLIR,
+        result);
 
     // count ints
     rr->mParcel.writeInt(1);
@@ -1232,7 +1312,8 @@ void RilRequest::setCLIR(int clirMode, RilResponse *result)
 void RilRequest::queryCallWaiting(int serviceClass, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_CALL_WAITING, result);
+        RIL_REQUEST_QUERY_CALL_WAITING,
+        result);
 
     rr->mParcel.writeInt(1);
     rr->mParcel.writeInt(serviceClass);
@@ -1246,7 +1327,8 @@ void RilRequest::queryCallWaiting(int serviceClass, RilResponse *result)
 void RilRequest::setCallWaiting(bool enable, int serviceClass, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_CALL_WAITING, result);
+        RIL_REQUEST_SET_CALL_WAITING,
+        result);
 
     rr->mParcel.writeInt(2);
     rr->mParcel.writeInt(enable ? 1 : 0);
@@ -1312,7 +1394,8 @@ void RilRequest::setCallForward(int action, int cfReason, int serviceClass,
                                 std::string number, int timeSeconds, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_CALL_FORWARD, result);
+        RIL_REQUEST_SET_CALL_FORWARD,
+        result);
 
     rr->mParcel.writeInt(action);
     rr->mParcel.writeInt(cfReason);
@@ -1332,7 +1415,8 @@ void RilRequest::queryCallForwardStatus(int cfReason, int serviceClass,
                                         std::string number, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_CALL_FORWARD_STATUS, result);
+        RIL_REQUEST_QUERY_CALL_FORWARD_STATUS,
+        result);
 
     rr->mParcel.writeInt(2); // 2 is for query action, not in used anyway
     rr->mParcel.writeInt(cfReason);
@@ -1351,7 +1435,8 @@ void RilRequest::queryCallForwardStatus(int cfReason, int serviceClass,
 void RilRequest::queryCLIP(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_CLIP, result);
+        RIL_REQUEST_QUERY_CLIP,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1362,7 +1447,8 @@ void RilRequest::queryCLIP(RilResponse *result)
 void RilRequest::getBasebandVersion(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_BASEBAND_VERSION, result);
+        RIL_REQUEST_BASEBAND_VERSION,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1380,7 +1466,8 @@ void RilRequest::queryFacilityLockForApp(std::string facility, std::string passw
                                          RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_FACILITY_LOCK, result);
+        RIL_REQUEST_QUERY_FACILITY_LOCK,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1408,7 +1495,8 @@ void RilRequest::setFacilityLockForApp(std::string facility, bool lockState, std
 {
     std::string lockString;
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_FACILITY_LOCK, result);
+        RIL_REQUEST_SET_FACILITY_LOCK,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1429,7 +1517,8 @@ void RilRequest::setFacilityLockForApp(std::string facility, bool lockState, std
 void RilRequest::sendUSSD(std::string ussdString, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SEND_USSD, result);
+        RIL_REQUEST_SEND_USSD,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << " " + ussdString << ENDL;
 
@@ -1442,7 +1531,8 @@ void RilRequest::sendUSSD(std::string ussdString, RilResponse *result)
 void RilRequest::cancelPendingUssd(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CANCEL_USSD, result);
+        RIL_REQUEST_CANCEL_USSD,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1453,7 +1543,8 @@ void RilRequest::cancelPendingUssd(RilResponse *result)
 void RilRequest::resetRadio(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_RESET_RADIO, result);
+        RIL_REQUEST_RESET_RADIO,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1464,7 +1555,8 @@ void RilRequest::resetRadio(RilResponse *result)
 // void RilRequest::invokeOemRilRequestRaw(uint8_t *data, RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(
-//               RIL_REQUEST_OEM_HOOK_RAW, result);
+//               RIL_REQUEST_OEM_HOOK_RAW,
+//               result);
 
 //     LOGV << rr->serialString() + "> " << rr->requestToString() << "[" + IccUtils.bytesToHexString(data) + "]" << ENDL;
 
@@ -1496,7 +1588,8 @@ void RilRequest::resetRadio(RilResponse *result)
 void RilRequest::setBandMode(int bandMode, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_BAND_MODE, result);
+        RIL_REQUEST_SET_BAND_MODE,
+        result);
 
     rr->mParcel.writeInt(1);
     rr->mParcel.writeInt(bandMode);
@@ -1578,7 +1671,7 @@ void RilRequest::sendEnvelopeWithStatus(std::string contents, RilResponse *resul
 
 //     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
-//     int[] param = new int[1];
+//     int[] param = new(std::nothrow) int[1];
 //     param[0] = accept ? 1 : 0;
 //     rr->mParcel.writeIntArray(param);
 //     RILREQUEST::send(rr);
@@ -1589,7 +1682,8 @@ void RilRequest::sendEnvelopeWithStatus(std::string contents, RilResponse *resul
 // void RilRequest::setPreferredNetworkType(int networkType, RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(
-//         RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE, result);
+//         RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE,
+//         result);
 
 //     rr->mParcel.writeInt(1);
 //     rr->mParcel.writeInt(networkType);
@@ -1606,7 +1700,8 @@ void RilRequest::sendEnvelopeWithStatus(std::string contents, RilResponse *resul
 void RilRequest::getPreferredNetworkType(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE, result);
+        RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1629,7 +1724,8 @@ void RilRequest::getNeighboringCids(RilResponse *result)
 void RilRequest::setLocationUpdates(bool enable, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_LOCATION_UPDATES, result);
+        RIL_REQUEST_SET_LOCATION_UPDATES,
+        result);
     rr->mParcel.writeInt(1);
     rr->mParcel.writeInt(enable ? 1 : 0);
 
@@ -1642,7 +1738,8 @@ void RilRequest::setLocationUpdates(bool enable, RilResponse *result)
 void RilRequest::getSmscAddress(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_SMSC_ADDRESS, result);
+        RIL_REQUEST_GET_SMSC_ADDRESS,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1653,7 +1750,8 @@ void RilRequest::getSmscAddress(RilResponse *result)
 void RilRequest::setSmscAddress(std::string address, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_SMSC_ADDRESS, result);
+        RIL_REQUEST_SET_SMSC_ADDRESS,
+        result);
 
     rr->mParcel.writeString(address.c_str());
 
@@ -1666,7 +1764,8 @@ void RilRequest::setSmscAddress(std::string address, RilResponse *result)
 void RilRequest::reportSmsMemoryStatus(bool available, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_REPORT_SMS_MEMORY_STATUS, result);
+        RIL_REQUEST_REPORT_SMS_MEMORY_STATUS,
+        result);
     rr->mParcel.writeInt(1);
     rr->mParcel.writeInt(available ? 1 : 0);
 
@@ -1679,7 +1778,8 @@ void RilRequest::reportSmsMemoryStatus(bool available, RilResponse *result)
 void RilRequest::reportStkServiceIsRunning(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING, result);
+        RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1690,7 +1790,8 @@ void RilRequest::reportStkServiceIsRunning(RilResponse *result)
 void RilRequest::getGsmBroadcastConfig(RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GSM_GET_BROADCAST_CONFIG, result);
+        RIL_REQUEST_GSM_GET_BROADCAST_CONFIG,
+        result);
 
     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
 
@@ -1701,7 +1802,8 @@ void RilRequest::getGsmBroadcastConfig(RilResponse *result)
 // void RilRequest::setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config, RilResponse *result)
 // {
 //     RilRequest *rr = RILREQUEST::obtain(
-//           RIL_REQUEST_GSM_SET_BROADCAST_CONFIG, result);
+//           RIL_REQUEST_GSM_SET_BROADCAST_CONFIG,
+//           result);
 
 //     int numOfConfig = config.length;
 //     rr->mParcel.writeInt(numOfConfig);
@@ -1730,7 +1832,8 @@ void RilRequest::getGsmBroadcastConfig(RilResponse *result)
 void RilRequest::setGsmBroadcastActivation(bool activate, RilResponse *result)
 {
     RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GSM_BROADCAST_ACTIVATION, result);
+        RIL_REQUEST_GSM_BROADCAST_ACTIVATION,
+        result);
 
     rr->mParcel.writeInt(1);
     rr->mParcel.writeInt(activate ? 0 : 1);
@@ -1979,6 +2082,7 @@ void RilRequest::processSolicited(Parcel &p)
     if (error == 0 || p.dataAvail() > 0)
     {
         // either command succeeds or command fails but with data payload
+        LOGV << "response id: " << get_commandid() << ENDL;
         switch (get_commandid())
         {
         case RIL_REQUEST_GET_SIM_STATUS:
@@ -2455,7 +2559,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //         unsljLog(response);
 
         //     // FIXME this should move up a layer
-        //     std::string a[] = new std::string[2];
+        //     std::string a[] = new(std::nothrow) std::string[2];
 
         //     a[1] = (std::string)ret;
 
@@ -2476,7 +2580,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mSmsStatusRegistrant != null)
         //     {
         //         mSmsStatusRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
         // case RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM:
@@ -2503,7 +2607,7 @@ void RilRequest::processUnsolicited(Parcel &p)
 
         //     if (resp.length < 2)
         //     {
-        //         resp = new std::string[2];
+        //         resp = new(std::nothrow) std::string[2];
         //         resp[0] = ((std::string[])ret)[0];
         //         resp[1] = null;
         //     }
@@ -2512,7 +2616,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mUSSDRegistrant != null)
         //     {
         //         mUSSDRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, resp, null));
+        //             new(std::nothrow) AsyncResult(null, resp, null));
         //     }
         //     break;
         // case RIL_UNSOL_NITZ_TIME_RECEIVED:
@@ -2523,7 +2627,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     // time was received
         //     long nitzReceiveTime = p.readLong();
 
-        //     Object[] result = new Object[2];
+        //     Object[] result = new(std::nothrow) Object[2];
 
         //     result[0] = ret;
         //     result[1] = Long.valueOf(nitzReceiveTime);
@@ -2550,7 +2654,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mSignalStrengthRegistrant != null)
         //     {
         //         mSignalStrengthRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
         // case RIL_UNSOL_DATA_CALL_LIST_CHANGED:
@@ -2567,7 +2671,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mSsnRegistrant != null)
         //     {
         //         mSsnRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2578,7 +2682,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mCatSessionEndRegistrant != null)
         //     {
         //         mCatSessionEndRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2589,7 +2693,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mCatProCmdRegistrant != null)
         //     {
         //         mCatProCmdRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2600,7 +2704,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mCatEventRegistrant != null)
         //     {
         //         mCatEventRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2611,7 +2715,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mCatCallSetUpRegistrant != null)
         //     {
         //         mCatCallSetUpRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2632,7 +2736,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mIccRefreshRegistrants != null)
         //     {
         //         mIccRefreshRegistrants.notifyRegistrants(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2643,7 +2747,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mRingRegistrant != null)
         //     {
         //         mRingRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2653,7 +2757,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mRestrictedStateRegistrant != null)
         //     {
         //         mRestrictedStateRegistrant.notifyRegistrant(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2718,7 +2822,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mCallWaitingInfoRegistrants != null)
         //     {
         //         mCallWaitingInfoRegistrants.notifyRegistrants(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2729,7 +2833,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mOtaProvisionRegistrants != null)
         //     {
         //         mOtaProvisionRegistrants.notifyRegistrants(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2770,7 +2874,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     {
         //         bool playtone = (((int[])ret)[0] == 1);
         //         mRingbackToneRegistrants.notifyRegistrants(
-        //             new AsyncResult(null, playtone, null));
+        //             new(std::nothrow) AsyncResult(null, playtone, null));
         //     }
         //     break;
 
@@ -2781,7 +2885,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mResendIncallMuteRegistrants != null)
         //     {
         //         mResendIncallMuteRegistrants.notifyRegistrants(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2792,7 +2896,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mCdmaSubscriptionChangedRegistrants != null)
         //     {
         //         mCdmaSubscriptionChangedRegistrants.notifyRegistrants(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2803,7 +2907,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mCdmaPrlChangedRegistrants != null)
         //     {
         //         mCdmaPrlChangedRegistrants.notifyRegistrants(
-        //             new AsyncResult(null, ret, null));
+        //             new(std::nothrow) AsyncResult(null, ret, null));
         //     }
         //     break;
 
@@ -2814,7 +2918,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     if (mExitEmergencyCallbackModeRegistrants != null)
         //     {
         //         mExitEmergencyCallbackModeRegistrants.notifyRegistrants(
-        //             new AsyncResult(null, nullptr, null));
+        //             new(std::nothrow) AsyncResult(null, nullptr, null));
         //     }
         //     break;
 
