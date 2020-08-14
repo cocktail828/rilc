@@ -176,6 +176,7 @@ public:
 #define ENDL std::endl
 
 #ifndef NDEBUG
+#define LOG(v) Logger::Instance(v, __FILE__, __LINE__, __func__)
 #define LOGI Logger::Instance(Severity::INFO, __FILE__, __LINE__, __func__)
 #define LOGV Logger::Instance(Severity::NOTICE, __FILE__, __LINE__, __func__)
 #define LOGD Logger::Instance(Severity::DEBUG, __FILE__, __LINE__, __func__)
@@ -189,6 +190,7 @@ public:
 #define LOGFE(a, v...) Logger::Instance(Severity::ERROR, __FILE__, __LINE__, __func__)(a, ##v)
 
 #else
+#define LOG(v) Logger::Instance(v)
 #define LOGI Logger::Instance()
 #define LOGV Logger::Instance()
 #define LOGD Logger::Instance()

@@ -152,7 +152,7 @@ bool DeviceManager::closeDevice()
     return true;
 }
 
-bool DeviceManager::sendAsync(void *data, int len)
+bool DeviceManager::sendAsync(const void *data, int len)
 {
     std::lock_guard<std::mutex> _lk(mRWLock);
 

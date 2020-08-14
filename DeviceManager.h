@@ -39,7 +39,7 @@ public:
 
     bool closeDevice();
 
-    bool sendAsync(void *data, int len);
+    bool sendAsync(const void *data, int len);
 
     int startPooling();
 

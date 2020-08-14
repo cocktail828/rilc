@@ -17,9 +17,9 @@
 #ifndef __RIL
 #define __RIL
 
-static const char *SETUP_DATA_PROTOCOL_IP = "IP";
-static const char *SETUP_DATA_PROTOCOL_IPV6 = "IPV6";
-static const char *SETUP_DATA_PROTOCOL_IPV4V6 = "IPV4V6";
+#define SETUP_DATA_PROTOCOL_IP "IP"
+#define SETUP_DATA_PROTOCOL_IPV6 "IPV6"
+#define SETUP_DATA_PROTOCOL_IPV4V6 "IPV4V6"
 enum RILConstants
 {
     // From the top of ril.cpp
@@ -106,13 +106,6 @@ enum RILConstants
     DEACTIVATE_REASON_NONE = 0,
     DEACTIVATE_REASON_RADIO_OFF = 1,
     DEACTIVATE_REASON_PDP_RESET = 2,
-
-    /*
-cat include/telephony/ril.h | \
-   egrep '^#define' | \
-   sed -re 's/^#define +([^ ]+)* +([^ ]+)/    \1 = \2,/' \
-   >>java/android/com.android.internal.telephony/gsm/RILConstants.java
-*/
 
     /**
      * No restriction at all including voice/SMS/USSD/SS/AV64
