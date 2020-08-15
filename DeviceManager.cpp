@@ -11,6 +11,7 @@
 
 #include "logger.h"
 #include "DeviceManager.h"
+#include "ril_request.h"
 #include "parcel/parcel.h"
 
 void poolRead(DeviceManager *args)
@@ -44,20 +45,21 @@ void poolRead(DeviceManager *args)
                 // serial closed?
                 if (events[i].events & EPOLLRDHUP)
                 {
-                    LOGW << "peer close device" << ENDL;
+                    LOGE << "peer close device" << ENDL;
                     break;
                 }
 
                 if (events[i].events & (EPOLLERR | EPOLLHUP))
                 {
-                    LOGW << "epoll error, event = " << events[i].events << ENDL;
+                    LOGE << "epoll error, event = " << events[i].events << ENDL;
                     break;
                 }
 
                 if (events[i].events & EPOLLIN)
                 {
+                    LOGD << "epoll get in event" << ENDL;
                     int olen = 0;
-                    static uint8_t recvBuff[1024 * 30];
+                    static uint8_t recvBuff[1024 * 8]; // RIL message has max size of 8K
                     size_t len = args->recvAsync(recvBuff, sizeof(recvBuff), &olen);
                     args->processResponse(recvBuff, len);
                 }
@@ -126,7 +128,10 @@ bool DeviceManager::openDevice()
         fd = open_unix_sock(mDevice.c_str());
 
     if (fd < 0)
+    {
+        LOGE << "open " << mDevice << " failed" << ENDL;
         return false;
+    }
 
     mHandle = fd;
     startPooling();
@@ -138,20 +143,21 @@ bool DeviceManager::closeDevice()
     /* close file descriper first, so polling thread will quit */
     close(mHandle);
 
-    /* remove all the ovservers */
-    for (auto o : mObservers)
-    {
-        o->update(nullptr);
-    }
-
-    for (auto iter = mObservers.begin();
-         iter < mObservers.end(); iter++)
-    {
-        delete *iter;
-    }
-    mObservers.clear();
+    detachAll();
     stopPooling();
     return true;
+}
+
+static void dump_msg(const void *data, int len)
+{
+    static char _msg[16 * 1024];
+    memset(_msg, 0, sizeof(_msg));
+
+    const uint8_t *ptr = reinterpret_cast<const uint8_t *>(data);
+    for (int i = 0; i < len; i++)
+        snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
+
+    LOGD << "dump_msg: " << _msg << ENDL;
 }
 
 bool DeviceManager::sendAsync(const void *data, int len)
@@ -161,6 +167,7 @@ bool DeviceManager::sendAsync(const void *data, int len)
     if (!mReady)
         return false;
 
+    dump_msg(data, len);
     ssize_t ret = write(mHandle, data, len);
     if (ret < 0)
     {
@@ -176,21 +183,11 @@ bool DeviceManager::recvAsync(void *data, int len, int *olen)
     if (!mReady)
         return false;
 
-    auto dum_msg = [&]() {
-        uint8_t *ptr = reinterpret_cast<uint8_t *>(data);
-        static char _msg[8 * 1024];
-        memset(_msg, 0, sizeof(_msg));
-        for (int i = 0; i < len; i++)
-            snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
-
-        LOGI << "dump_msg: " << _msg << ENDL;
-    };
-
     ssize_t ret = read(mHandle, data, len);
     if (ret < 0)
         return false;
 
-    dum_msg();
+    dump_msg(data, *olen);
     if (olen)
         *olen = ret;
     return true;
@@ -237,22 +234,23 @@ void DeviceManager::processResponse(void *data, size_t len)
 
     p.setData(reinterpret_cast<uint8_t *>(data), len);
     int type = p.readInt();
-    Argument arg = {type, p};
 
+    // process unsolicited myself */
     if (type == RESPONSE_UNSOLICITED)
     {
-        for (auto o : mObservers)
-        {
-            o->update(reinterpret_cast<void *>(&arg));
-        }
+        RILREQUEST::processUnsolicited(p);
     }
     else if (type == RESPONSE_SOLICITED)
     {
+        /* find the observer and notice him */
         int requestid = p.readInt();
         for (auto o : mObservers)
         {
             if (o->get_requestid() == requestid)
-                o->update(reinterpret_cast<void *>(&arg));
+            {
+                o->update(p);
+                detach(o);
+            }
         }
     }
 }

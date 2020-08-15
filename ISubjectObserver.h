@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "parcel/parcel.h"
+#include "logger.h"
 
 class IObserver
 {
@@ -16,32 +17,60 @@ protected:
 public:
     IObserver() {}
     virtual ~IObserver() {}
-    virtual void update(void *data) = 0;
+    virtual void update(Parcel &p) = 0;
     virtual int get_requestid() = 0;
     virtual int get_commandid() = 0;
 };
 
 class ISubject
 {
+private:
+    std::mutex mListLock;
+
 protected:
     std::vector<IObserver *> mObservers;
 
 public:
-    virtual void processResponse(void *data, size_t len) = 0;
-
     void attach(IObserver *o)
     {
+        std::lock_guard<std::mutex> _lk(mListLock);
+        LOGD << "attach new observer: sn "
+             << o->get_requestid() << " cid "
+             << o->get_commandid() << ENDL;
         mObservers.emplace_back(o);
     }
 
     void detach(IObserver *o)
     {
-        for (auto iter = mObservers.begin();
-             iter != mObservers.end(); iter++)
+        std::lock_guard<std::mutex> _lk(mListLock);
+        for (auto iter = mObservers.begin(); iter != mObservers.end();)
         {
             if ((*iter) == o)
+            {
+                LOGD << "detach observer(" + std::to_string(mObservers.size()) + ") sn "
+                     << o->get_requestid()
+                     << " cid " << o->get_commandid() << ENDL;
                 mObservers.erase(iter);
+            }
+            else
+            {
+                iter++;
+            }
         }
+    }
+
+    void detachAll()
+    {
+        std::lock_guard<std::mutex> _lk(mListLock);
+        /* notice all the ovservers the quit event */
+        for (auto o : mObservers)
+        {
+            Parcel p;
+            LOGD << "removing observer: sn " << o->get_requestid() << ENDL;
+            o->update(p);
+        }
+
+        mObservers.clear();
     }
 };
 

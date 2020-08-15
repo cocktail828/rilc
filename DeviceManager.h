@@ -1,15 +1,10 @@
+#ifndef __DEVICEMANAGER
+#define __DEVICEMANAGER
+
 #include <thread>
 #include <future>
 
 #include "ISubjectObserver.h"
-
-class Parcel;
-typedef struct
-{
-    /* solicited or unsolicited message */
-    int type;
-    Parcel &parcel;
-} Argument;
 
 class DeviceManager final : public ISubject
 {
@@ -52,3 +47,5 @@ private:
 
     void processResponse(void *data, size_t len);
 };
+
+#endif //__DEVICEMANAGER

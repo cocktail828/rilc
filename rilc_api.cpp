@@ -6,10 +6,9 @@
 
 int RILC_init(const char *device)
 {
-    const int max_try = 100;
+    const int max_try = 30;
     int try_time = 0;
 
-    LINE;
     /* another thread is doing init? */
     if (!RILREQUEST::mGlobalLock.try_lock())
         return EBUSY;
@@ -20,17 +19,27 @@ int RILC_init(const char *device)
         return 0;
     }
 
-    LINE;
     for (try_time = 0; try_time < max_try; try_time++)
     {
-        LINE;
         if (RILREQUEST::instance().init(device))
             break;
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        LOGI << "start polling thread fail, times = " << try_time << ENDL;
     }
+
+    bool ret = RILREQUEST::instance().isReady();
+    if (ret)
+    {
+        LOGI << "init seccussfully " << ENDL;
+    }
+    else
+    {
+        LOGI << "init failed " << ENDL;
+    }
+
     RILREQUEST::mGlobalLock.unlock();
-    LOGI << "init seccussfully " << ENDL;
-    return 0;
+
+    return ret;
 }
 
 int RILC_uninit()
@@ -48,9 +57,16 @@ int RILC_uninit()
 
 int RILC_requestIMSI()
 {
-    RilRequest *req = new RilRequest();
+    RilRequest req;
+    req.getIMSI();
 
-    req->getIMSI(new RilResponse());
+    return 0;
+}
+
+int RILC_sendEnvelope(const char *cnt)
+{
+    RilRequest req;
+    req.sendEnvelope(cnt);
 
     return 0;
 }

@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "ril_request.h"
+#include "ril_response.h"
 #include "logger.h"
 #include "ril.h"
 
@@ -11,26 +12,33 @@ int RilRequest::mGlobalRequestId = 0;
 bool RilRequest::mReady = false;
 std::mutex RilRequest::mGlobalLock;
 
-RilRequest *RilRequest::obtain(int cid, RilResponse *result)
+/**
+ * use dto build an new request will only 'command id'
+ */
+void RilRequest::obtain(int cid)
 {
-    RilRequest *rr = new (std::nothrow) RilRequest();
+    mRequestId = mGlobalRequestId++;
+    mCommandId = cid;
 
-    rr->mRequestId = rr->mGlobalRequestId++;
-    rr->mCommandId = cid;
-    rr->mResponse = result;
-
-    rr->mParcel.writeInt(cid);
-    rr->mParcel.writeInt(rr->mRequestId);
-
-    return rr;
+    mParcel.writeInt(cid);
+    mParcel.writeInt(mRequestId);
 }
 
+/**
+ * Notice, the instance is an static variable,
+ * which means, it's the same for all instances of the class.
+ * for all instances shared the same DevciceManager and mGlobalRequestId
+ */
 RilRequest &RilRequest::instance()
 {
     static RilRequest instance_;
     return instance_;
 }
 
+/**
+ * start a new polling thread for read.
+ * the thread is need for reading response and send requests
+ */
 bool RilRequest::init(const char *device)
 {
     assert(device != nullptr);
@@ -43,9 +51,21 @@ bool RilRequest::init(const char *device)
             return false;
     }
 
-    return mDeviceMgr->openDevice();
+    if (!mDeviceMgr->openDevice())
+        return false;
+
+    for (int times = 0; times < 10; times++)
+    {
+        if (mDeviceMgr->isReady())
+            return true;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    return false;
 }
 
+/**
+ * clean up what is created in 'init' function
+ */
 bool RilRequest::uninit()
 {
     if (mDeviceMgr)
@@ -60,6 +80,9 @@ bool RilRequest::uninit()
     return false;
 }
 
+/**
+ * check whether the DeviceManager is ready for send and read
+ */
 bool RilRequest::isReady()
 {
     mReady = mDeviceMgr && mDeviceMgr->isReady();
@@ -72,29 +95,25 @@ void RilRequest::resetRequest()
     mGlobalRequestId = 0;
 }
 
-void RilRequest::send(RilRequest *rr)
+/**
+ * send requests. if success, the request will be add the observer list
+ * so it can be notified, if it's response reachs
+ */
+bool RilRequest::send(RilRequest *rr)
 {
-    auto dum_msg = [&]() {
-        const uint8_t *ptr = rr->mParcel.data();
-        static char _msg[8 * 1024];
-        memset(_msg, 0, sizeof(_msg));
-        for (int i = 0; i < rr->mParcel.dataSize(); i++)
-            snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
-
-        LOGI << "dump_msg: " << _msg << ENDL;
-    };
-
     if (mDeviceMgr && mDeviceMgr->isReady())
     {
-        dum_msg();
-        mDeviceMgr->sendAsync(reinterpret_cast<const void *>(mParcel.data()),
-                              mParcel.dataSize());
-        mDeviceMgr->attach(this);
+        mDeviceMgr->sendAsync(
+            reinterpret_cast<const void *>(rr->mParcel.data()),
+            rr->mParcel.dataSize());
+        mDeviceMgr->attach(rr);
+        return true;
     }
     else
     {
         LOGE << "device is not ready" << ENDL;
     }
+    return false;
 }
 
 RilRequest::RilRequest()
@@ -103,39 +122,33 @@ RilRequest::RilRequest()
 
 RilRequest::~RilRequest()
 {
-    if (mResponse)
-    {
-        delete mResponse;
-        mResponse = nullptr;
-    }
 }
 
-/* When get some message from requestid, this function will be called */
-void RilRequest::update(void *_arg)
+/**
+ * When get some message from DeviceManager, this function will be called
+ */
+void RilRequest::update(Parcel &p)
 {
     /* oops! device manager is destroyed */
-    if (!_arg)
+    if (p.dataSize() == 0)
     {
         LOGW << "null response get, device connect may be broken" << ENDL;
-        mCond.notify_one();
+        mRequestcond.notify_one();
+        return;
     }
 
-    Argument *arg = reinterpret_cast<Argument *>(_arg);
-    if (arg->type == RESPONSE_SOLICITED)
-    {
-        processSolicited(arg->parcel);
-    }
-    else if (arg->type == RESPONSE_UNSOLICITED)
-    {
-        processUnsolicited(arg->parcel);
-    }
+    /**
+     * we only process socilited message response here
+     * unsolicited message should be processed in DeviceManager
+     */
+    processSolicited(p);
 
     return;
 }
 
-std::string RilRequest::serialString()
+static std::string requestidString(int id)
 {
-    return std::to_string(mRequestId);
+    return std::to_string(id);
 }
 
 int RilRequest::get_requestid()
@@ -148,9 +161,9 @@ int RilRequest::get_commandid()
     return mCommandId;
 }
 
-std::string RilRequest::requestToString()
+static std::string commandidToString(int cid)
 {
-    switch (mCommandId)
+    switch (cid)
     {
     case RIL_REQUEST_GET_SIM_STATUS:
         return "GET_SIM_STATUS";
@@ -315,7 +328,7 @@ std::string RilRequest::requestToString()
     case RIL_REQUEST_QUERY_TTY_MODE:
         return "RIL_REQUEST_QUERY_TTY_MODE";
     case RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE:
-        return "RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE";
+        return "RIL_REQUEST_CDMA_SET_PREFEthisED_VOICE_PRIVACY_MODE";
     case RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE:
         return "RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE";
     case RIL_REQUEST_CDMA_FLASH:
@@ -371,654 +384,988 @@ std::string RilRequest::requestToString()
     }
 }
 
-void RilRequest::getIccCardStatus(RilResponse *result)
+void RilRequest::getIccCardStatus()
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_SIM_STATUS,
-        result);
+    obtain(RIL_REQUEST_GET_SIM_STATUS);
 
-    LOGV << rr->serialString() << "> " << rr->requestToString() << ENDL;
-    RILREQUEST::send(rr);
-    mResponse = result;
+    LOGD << requestidString(get_requestid()) << "> " << commandidToString(get_commandid()) << ENDL;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::supplyIccPin(std::string pin, RilResponse *result)
+void RilRequest::supplyIccPin(std::string pin)
 {
-    supplyIccPinForApp(pin, "",
-                       result);
+    supplyIccPinForApp(pin, "");
 }
 
-void RilRequest::supplyIccPinForApp(std::string pin, std::string aid, RilResponse *result)
+void RilRequest::supplyIccPinForApp(std::string pin, std::string aid)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_SIM_PIN,
-        result);
+    obtain(RIL_REQUEST_ENTER_SIM_PIN);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeInt(2);
-    rr->mParcel.writeString(pin.c_str());
-    rr->mParcel.writeString(aid.c_str());
+    mParcel.writeInt(2);
+    mParcel.writeString(pin.c_str());
+    mParcel.writeString(aid.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::supplyIccPuk(std::string puk, std::string newPin, RilResponse *result)
+void RilRequest::supplyIccPuk(std::string puk, std::string newPin)
 {
-    supplyIccPukForApp(puk, newPin, "",
-                       result);
+    supplyIccPukForApp(puk, newPin, "");
 }
 
-void RilRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::string aid, RilResponse *result)
+void RilRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::string aid)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_SIM_PUK,
-        result);
+    obtain(RIL_REQUEST_ENTER_SIM_PUK);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeInt(3);
-    rr->mParcel.writeString(puk.c_str());
-    rr->mParcel.writeString(newPin.c_str());
-    rr->mParcel.writeString(aid.c_str());
+    mParcel.writeInt(3);
+    mParcel.writeString(puk.c_str());
+    mParcel.writeString(newPin.c_str());
+    mParcel.writeString(aid.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::supplyIccPin2(std::string pin, RilResponse *result)
+void RilRequest::supplyIccPin2(std::string pin)
 {
-    supplyIccPin2ForApp(pin, "",
-                        result);
+    supplyIccPin2ForApp(pin, "");
 }
 
-void RilRequest::supplyIccPin2ForApp(std::string pin, std::string aid, RilResponse *result)
+void RilRequest::supplyIccPin2ForApp(std::string pin, std::string aid)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_SIM_PIN2,
-        result);
+    obtain(RIL_REQUEST_ENTER_SIM_PIN2);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeInt(2);
-    rr->mParcel.writeString(pin.c_str());
-    rr->mParcel.writeString(aid.c_str());
+    mParcel.writeInt(2);
+    mParcel.writeString(pin.c_str());
+    mParcel.writeString(aid.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::supplyIccPuk2(std::string puk2, std::string newPin2, RilResponse *result)
+void RilRequest::supplyIccPuk2(std::string puk2, std::string newPin2)
 {
-    supplyIccPuk2ForApp(puk2, newPin2, "",
-                        result);
+    supplyIccPuk2ForApp(puk2, newPin2, "");
 }
 
-void RilRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid, RilResponse *result)
+void RilRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_SIM_PUK2,
-        result);
+    obtain(RIL_REQUEST_ENTER_SIM_PUK2);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeInt(3);
-    rr->mParcel.writeString(puk.c_str());
-    rr->mParcel.writeString(newPin2.c_str());
-    rr->mParcel.writeString(aid.c_str());
+    mParcel.writeInt(3);
+    mParcel.writeString(puk.c_str());
+    mParcel.writeString(newPin2.c_str());
+    mParcel.writeString(aid.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::changeIccPin(std::string oldPin, std::string newPin, RilResponse *result)
+void RilRequest::changeIccPin(std::string oldPin, std::string newPin)
 {
-    changeIccPinForApp(oldPin, newPin, "",
-                       result);
+    changeIccPinForApp(oldPin, newPin, "");
 }
 
-void RilRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid, RilResponse *result)
+void RilRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CHANGE_SIM_PIN,
-        result);
+    obtain(RIL_REQUEST_CHANGE_SIM_PIN);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeInt(3);
-    rr->mParcel.writeString(oldPin.c_str());
-    rr->mParcel.writeString(newPin.c_str());
-    rr->mParcel.writeString(aid.c_str());
+    mParcel.writeInt(3);
+    mParcel.writeString(oldPin.c_str());
+    mParcel.writeString(newPin.c_str());
+    mParcel.writeString(aid.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::changeIccPin2(std::string oldPin2, std::string newPin2, RilResponse *result)
+void RilRequest::changeIccPin2(std::string oldPin2, std::string newPin2)
 {
-    changeIccPin2ForApp(oldPin2, newPin2, "",
-                        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    changeIccPin2ForApp(oldPin2, newPin2, "");
 }
 
-void RilRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid, RilResponse *result)
+void RilRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CHANGE_SIM_PIN2,
-        result);
+    obtain(RIL_REQUEST_CHANGE_SIM_PIN2);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeInt(3);
-    rr->mParcel.writeString(oldPin2.c_str());
-    rr->mParcel.writeString(newPin2.c_str());
-    rr->mParcel.writeString(aid.c_str());
+    mParcel.writeInt(3);
+    mParcel.writeString(oldPin2.c_str());
+    mParcel.writeString(newPin2.c_str());
+    mParcel.writeString(aid.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd, RilResponse *result)
+void RilRequest::changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CHANGE_BARRING_PASSWORD,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_CHANGE_BARRING_PASSWORD);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeInt(3);
-    rr->mParcel.writeString(facility.c_str());
-    rr->mParcel.writeString(oldPwd.c_str());
-    rr->mParcel.writeString(newPwd.c_str());
+    mParcel.writeInt(3);
+    mParcel.writeString(facility.c_str());
+    mParcel.writeString(oldPwd.c_str());
+    mParcel.writeString(newPwd.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::supplyNetworkDepersonalization(std::string netpin, RilResponse *result)
+void RilRequest::supplyNetworkDepersonalization(std::string netpin)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeString(netpin.c_str());
+    mParcel.writeInt(1);
+    mParcel.writeString(netpin.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getCurrentCalls(RilResponse *result)
+void RilRequest::getCurrentCalls()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_CURRENT_CALLS,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GET_CURRENT_CALLS);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-__attribute_deprecated__ void RilRequest::getPDPContextList(RilResponse *result)
+__attribute_deprecated__ void RilRequest::getPDPContextList()
 {
-    getDataCallList(result);
+    getDataCallList();
 }
 
-void RilRequest::getDataCallList(RilResponse *result)
+void RilRequest::getDataCallList()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DATA_CALL_LIST,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_DATA_CALL_LIST);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-// void RilRequest::dial(std::string address, int clirMode, RilResponse *result)
+// void RilRequest::dial(std::string address, int clirMode)
 // {
-//     dial(address, clirMode, "", result);
+//     dial(address, clirMode, "");
 // }
 
-// void RilRequest::dial(std::string address, int clirMode, UUSInfo *uusInfo, RilResponse *result)
+// void RilRequest::dial(std::string address, int clirMode, UUSInfo *uusInfo)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//              RIL_REQUEST_DIAL, result);
+//     obtain(//              RIL_REQUEST_DIAL);
 
-//     rr->mParcel.writeString(address.c_str());
-//     rr->mParcel.writeInt(clirMode);
-//     rr->mParcel.writeInt(0); // UUS information is absent
+//     mParcel.writeString(address.c_str());
+//     mParcel.writeInt(clirMode);
+//     mParcel.writeInt(0); // UUS information is absent
 
 //     if (uusInfo == nullptr)
 //     {
-//         rr->mParcel.writeInt(0); // UUS information is absent
+//         mParcel.writeInt(0); // UUS information is absent
 //     }
 //     else
 //     {
-//         rr->mParcel.writeInt(1); // UUS information is present
-//         rr->mParcel.writeInt(uusInfo.getType());
-//         rr->mParcel.writeInt(uusInfo.getDcs());
-//         rr->mParcel.writeByteArray(uusInfo.getUserData());
+//         mParcel.writeInt(1); // UUS information is present
+//         mParcel.writeInt(uusInfo.getType());
+//         mParcel.writeInt(uusInfo.getDcs());
+//         mParcel.writeByteAthisay(uusInfo.getUserData());
 //     }
 
-//     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
-//     mResponse = result;
+//     LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 
-void RilRequest::getIMSI(RilResponse *result)
+void RilRequest::getIMSI()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_IMSI,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GET_IMSI);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getIMEI(RilResponse *result)
+void RilRequest::getIMEI()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_IMEI,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GET_IMEI);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getIMEISV(RilResponse *result)
+void RilRequest::getIMEISV()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_IMEISV,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GET_IMEISV);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::hangupConnection(int gsmIndex, RilResponse *result)
+void RilRequest::hangupConnection(int gsmIndex)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     LOGFW("hangupConnection: gsmIndex = ", gsmIndex);
 
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_HANGUP,
-        result);
+    obtain(RIL_REQUEST_HANGUP);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << gsmIndex << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << gsmIndex << ENDL;
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(gsmIndex);
+    mParcel.writeInt(1);
+    mParcel.writeInt(gsmIndex);
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::hangupWaitingOrBackground(RilResponse *result)
+void RilRequest::hangupWaitingOrBackground()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::hangupForegroundResumeBackground(RilResponse *result)
+void RilRequest::hangupForegroundResumeBackground()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::switchWaitingOrHoldingAndActive(RilResponse *result)
+void RilRequest::switchWaitingOrHoldingAndActive()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::conference(RilResponse *result)
+void RilRequest::conference()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CONFERENCE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_CONFERENCE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setPreferredVoicePrivacy(bool enable, RilResponse *result)
+void RilRequest::setPreferredVoicePrivacy(bool enable)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE);
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(enable ? 1 : 0);
+    mParcel.writeInt(1);
+    mParcel.writeInt(enable ? 1 : 0);
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getPreferredVoicePrivacy(RilResponse *result)
+void RilRequest::getPreferredVoicePrivacy()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE,
-        result);
-    RILREQUEST::send(rr);
-    mResponse = result;
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE);
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::separateConnection(int gsmIndex, RilResponse *result)
+void RilRequest::separateConnection(int gsmIndex)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SEPARATE_CONNECTION,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SEPARATE_CONNECTION);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << gsmIndex << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << gsmIndex << ENDL;
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(gsmIndex);
+    mParcel.writeInt(1);
+    mParcel.writeInt(gsmIndex);
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::acceptCall(RilResponse *result)
+void RilRequest::acceptCall()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ANSWER,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_ANSWER);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::rejectCall(RilResponse *result)
+void RilRequest::rejectCall()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_UDUB,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_UDUB);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::explicitCallTransfer(RilResponse *result)
+void RilRequest::explicitCallTransfer()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_EXPLICIT_CALL_TRANSFER,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_EXPLICIT_CALL_TRANSFER);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getLastCallFailCause(RilResponse *result)
+void RilRequest::getLastCallFailCause()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_LAST_CALL_FAIL_CAUSE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_LAST_CALL_FAIL_CAUSE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-__attribute_deprecated__ void RilRequest::getLastPdpFailCause(RilResponse *result)
+__attribute_deprecated__ void RilRequest::getLastPdpFailCause()
 {
-    getLastDataCallFailCause(result);
+    getLastDataCallFailCause();
 }
 
 /**
- * The preferred new(std::nothrow) alternative to getLastPdpFailCause
+ * The prefethised new(std::nothrow) alternative to getLastPdpFailCause
  */
-void RilRequest::getLastDataCallFailCause(RilResponse *result)
+void RilRequest::getLastDataCallFailCause()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setMute(bool enableMute, RilResponse *result)
+void RilRequest::setMute(bool enableMute)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_MUTE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_MUTE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << enableMute << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << enableMute << ENDL;
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(enableMute ? 1 : 0);
+    mParcel.writeInt(1);
+    mParcel.writeInt(enableMute ? 1 : 0);
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getMute(RilResponse *result)
+void RilRequest::getMute()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_MUTE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GET_MUTE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getSignalStrength(RilResponse *result)
+void RilRequest::getSignalStrength()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SIGNAL_STRENGTH,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SIGNAL_STRENGTH);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getVoiceRegistrationState(RilResponse *result)
+void RilRequest::getVoiceRegistrationState()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_VOICE_REGISTRATION_STATE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_VOICE_REGISTRATION_STATE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getDataRegistrationState(RilResponse *result)
+void RilRequest::getDataRegistrationState()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DATA_REGISTRATION_STATE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_DATA_REGISTRATION_STATE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getOperator(RilResponse *result)
+void RilRequest::getOperator()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_OPERATOR,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_OPERATOR);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::sendDtmf(char c, RilResponse *result)
+void RilRequest::sendDtmf(char c)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DTMF,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_DTMF);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeString(std::to_string(int(c)).c_str());
+    mParcel.writeString(std::to_string(int(c)).c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::startDtmf(char c, RilResponse *result)
+void RilRequest::startDtmf(char c)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DTMF_START,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_DTMF_START);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeString(std::to_string(int(c)).c_str());
+    mParcel.writeString(std::to_string(int(c)).c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::stopDtmf(RilResponse *result)
+void RilRequest::stopDtmf()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DTMF_STOP,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_DTMF_STOP);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::sendBurstDtmf(std::string dtmfString, int on, int off, RilResponse *result)
+void RilRequest::sendBurstDtmf(std::string dtmfString, int on, int off)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CDMA_BURST_DTMF,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_CDMA_BURST_DTMF);
 
-    rr->mParcel.writeInt(3);
-    rr->mParcel.writeString(dtmfString.c_str());
-    rr->mParcel.writeString(std::to_string(on).c_str());
-    rr->mParcel.writeString(std::to_string(off).c_str());
+    mParcel.writeInt(3);
+    mParcel.writeString(dtmfString.c_str());
+    mParcel.writeString(std::to_string(on).c_str());
+    mParcel.writeString(std::to_string(off).c_str());
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << dtmfString << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << dtmfString << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::sendSMS(std::string smscPDU, std::string pdu, RilResponse *result)
+void RilRequest::sendSMS(std::string smscPDU, std::string pdu)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SEND_SMS,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SEND_SMS);
 
-    rr->mParcel.writeInt(2);
-    rr->mParcel.writeString(smscPDU.c_str());
-    rr->mParcel.writeString(pdu.c_str());
+    mParcel.writeInt(2);
+    mParcel.writeString(smscPDU.c_str());
+    mParcel.writeString(pdu.c_str());
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-// void RilRequest::sendCdmaSms(uint8_t *pdu, RilResponse *result)
+// void RilRequest::sendCdmaSms(uint8_t *pdu)
 // {
 //     int address_nbr_of_digits;
 //     int subaddr_nbr_of_digits;
 //     int bearerDataLength;
-//     ByteArrayInputStream bais = new(std::nothrow) ByteArrayInputStream(pdu);
+//     ByteAthisayInputStream bais = new(std::nothrow) ByteAthisayInputStream(pdu);
 //     DataInputStream dis = new(std::nothrow) DataInputStream(bais);
 
-//     RilRequest *rr = RILREQUEST::obtain(
-//            RIL_REQUEST_CDMA_SEND_SMS,
+//     obtain(//            RIL_REQUEST_CDMA_SEND_SMS,
 //            result);
 
 //     try
 //     {
-//         rr->mParcel.writeInt(dis.readInt());        //teleServiceId
-//         rr->mParcel.writeByte((byte)dis.readInt()); //servicePresent
-//         rr->mParcel.writeInt(dis.readInt());        //serviceCategory
-//         rr->mParcel.writeInt(dis.read());           //address_digit_mode
-//         rr->mParcel.writeInt(dis.read());           //address_nbr_mode
-//         rr->mParcel.writeInt(dis.read());           //address_ton
-//         rr->mParcel.writeInt(dis.read());           //address_nbr_plan
+//         mParcel.writeInt(dis.readInt());        //teleServiceId
+//         mParcel.writeByte((byte)dis.readInt()); //servicePresent
+//         mParcel.writeInt(dis.readInt());        //serviceCategory
+//         mParcel.writeInt(dis.read());           //address_digit_mode
+//         mParcel.writeInt(dis.read());           //address_nbr_mode
+//         mParcel.writeInt(dis.read());           //address_ton
+//         mParcel.writeInt(dis.read());           //address_nbr_plan
 //         address_nbr_of_digits = (byte)dis.read();
-//         rr->mParcel.writeByte((byte)address_nbr_of_digits);
+//         mParcel.writeByte((byte)address_nbr_of_digits);
 //         for (int i = 0; i < address_nbr_of_digits; i++)
 //         {
-//             rr->mParcel.writeByte(dis.readByte()); // address_orig_bytes[i]
+//             mParcel.writeByte(dis.readByte()); // address_orig_bytes[i]
 //         }
-//         rr->mParcel.writeInt(dis.read());        //subaddressType
-//         rr->mParcel.writeByte((byte)dis.read()); //subaddr_odd
+//         mParcel.writeInt(dis.read());        //subaddressType
+//         mParcel.writeByte((byte)dis.read()); //subaddr_odd
 //         subaddr_nbr_of_digits = (byte)dis.read();
-//         rr->mParcel.writeByte((byte)subaddr_nbr_of_digits);
+//         mParcel.writeByte((byte)subaddr_nbr_of_digits);
 //         for (int i = 0; i < subaddr_nbr_of_digits; i++)
 //         {
-//             rr->mParcel.writeByte(dis.readByte()); //subaddr_orig_bytes[i]
+//             mParcel.writeByte(dis.readByte()); //subaddr_orig_bytes[i]
 //         }
 
 //         bearerDataLength = dis.read();
-//         rr->mParcel.writeInt(bearerDataLength);
+//         mParcel.writeInt(bearerDataLength);
 //         for (int i = 0; i < bearerDataLength; i++)
 //         {
-//             rr->mParcel.writeByte(dis.readByte()); //bearerData[i]
+//             mParcel.writeByte(dis.readByte()); //bearerData[i]
 //         }
 //     }
 //     catch (IOException ex)
@@ -1027,42 +1374,59 @@ void RilRequest::sendSMS(std::string smscPDU, std::string pdu, RilResponse *resu
 //         riljLog("sendSmsCdma: conversion from input stream to object failed: " + ex);
 //     }
 
-//     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//     LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 //     mResponse = result;
 // }
 
-void RilRequest::deleteSmsOnSim(int index, RilResponse *result)
+void RilRequest::deleteSmsOnSim(int index)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DELETE_SMS_ON_SIM,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_DELETE_SMS_ON_SIM);
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(index);
+    mParcel.writeInt(1);
+    mParcel.writeInt(index);
 
     if (false)
-        LOGV << rr->serialString() + "> " << rr->requestToString() << index << ENDL;
+        LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << index << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::deleteSmsOnRuim(int index, RilResponse *result)
+void RilRequest::deleteSmsOnRuim(int index)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM);
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(index);
+    mParcel.writeInt(1);
+    mParcel.writeInt(index);
 
     if (false)
-        LOGV << rr->serialString() + "> " << rr->requestToString() << index << ENDL;
+        LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << index << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
 /** Free space (TS 51.011 10.5.3 / 3GPP2 C.S0023 3.4.27). */
@@ -1097,485 +1461,722 @@ int RilRequest::translateStatus(int status)
     return 1;
 }
 
-void RilRequest::writeSmsToSim(int status, std::string smsc, std::string pdu, RilResponse *result)
+void RilRequest::writeSmsToSim(int status, std::string smsc, std::string pdu)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     status = translateStatus(status);
 
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_WRITE_SMS_TO_SIM,
-        result);
+    obtain(RIL_REQUEST_WRITE_SMS_TO_SIM);
 
-    rr->mParcel.writeInt(status);
-    rr->mParcel.writeString(pdu.c_str());
-    rr->mParcel.writeString(smsc.c_str());
+    mParcel.writeInt(status);
+    mParcel.writeString(pdu.c_str());
+    mParcel.writeString(smsc.c_str());
 
     if (false)
-        LOGV << rr->serialString() + "> " << rr->requestToString() << status << ENDL;
+        LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << status << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::writeSmsToRuim(int status, std::string pdu, RilResponse *result)
+void RilRequest::writeSmsToRuim(int status, std::string pdu)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     status = translateStatus(status);
 
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM,
-        result);
+    obtain(RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM);
 
-    rr->mParcel.writeInt(status);
-    rr->mParcel.writeString(pdu.c_str());
+    mParcel.writeInt(status);
+    mParcel.writeString(pdu.c_str());
 
     if (false)
-        LOGV << rr->serialString() + "> " << rr->requestToString() << status << ENDL;
+        LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << status << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
 void RilRequest::setupDataCall(std::string radioTechnology, std::string profile, std::string apn,
-                               std::string user, std::string password, std::string authType, std::string protocol,
-                               RilResponse *result)
+                               std::string user, std::string password, std::string authType, std::string protocol)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SETUP_DATA_CALL,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SETUP_DATA_CALL);
 
-    rr->mParcel.writeInt(7);
+    mParcel.writeInt(7);
 
-    rr->mParcel.writeString(radioTechnology.c_str());
-    rr->mParcel.writeString(profile.c_str());
-    rr->mParcel.writeString(apn.c_str());
-    rr->mParcel.writeString(user.c_str());
-    rr->mParcel.writeString(password.c_str());
-    rr->mParcel.writeString(authType.c_str());
-    rr->mParcel.writeString(protocol.c_str());
+    mParcel.writeString(radioTechnology.c_str());
+    mParcel.writeString(profile.c_str());
+    mParcel.writeString(apn.c_str());
+    mParcel.writeString(user.c_str());
+    mParcel.writeString(password.c_str());
+    mParcel.writeString(authType.c_str());
+    mParcel.writeString(protocol.c_str());
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " "
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " "
          << radioTechnology + " " + profile + " " + apn + " " + user + " "
          << password + " " + authType + " " + protocol << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::deactivateDataCall(int cid, int reason, RilResponse *result)
+void RilRequest::deactivateDataCall(int cid, int reason)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_DEACTIVATE_DATA_CALL,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_DEACTIVATE_DATA_CALL);
 
-    rr->mParcel.writeInt(2);
-    rr->mParcel.writeString(std::to_string(cid).c_str());
-    rr->mParcel.writeString(std::to_string(reason).c_str());
+    mParcel.writeInt(2);
+    mParcel.writeString(std::to_string(cid).c_str());
+    mParcel.writeString(std::to_string(reason).c_str());
 
-    LOGV << rr->serialString() + "> " << requestToString() << " " << cid + " " << reason << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " " << cid + " " << reason << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setRadioPower(bool on, RilResponse *result)
+void RilRequest::setRadioPower(bool on)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_RADIO_POWER,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_RADIO_POWER);
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(on ? 1 : 0);
+    mParcel.writeInt(1);
+    mParcel.writeInt(on ? 1 : 0);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << (on ? " on" : " off") << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << (on ? " on" : " off") << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setSuppServiceNotifications(bool enable, RilResponse *result)
+void RilRequest::setSuppServiceNotifications(bool enable)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION);
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(enable ? 1 : 0);
+    mParcel.writeInt(1);
+    mParcel.writeInt(enable ? 1 : 0);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::acknowledgeLastIncomingGsmSms(bool success, int cause, RilResponse *result)
+void RilRequest::acknowledgeLastIncomingGsmSms(bool success, int cause)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SMS_ACKNOWLEDGE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SMS_ACKNOWLEDGE);
 
-    rr->mParcel.writeInt(2);
-    rr->mParcel.writeInt(success ? 1 : 0);
-    rr->mParcel.writeInt(cause);
+    mParcel.writeInt(2);
+    mParcel.writeInt(success ? 1 : 0);
+    mParcel.writeInt(cause);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " " << success << " " << cause << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " " << success << " " << cause << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause, RilResponse *result)
+void RilRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE);
 
-    rr->mParcel.writeInt(success ? 0 : 1); //RIL_CDMA_SMS_ErrorClass
+    mParcel.writeInt(success ? 0 : 1); //RIL_CDMA_SMS_EthisorClass
     // cause code according to X.S004-550E
-    rr->mParcel.writeInt(cause);
+    mParcel.writeInt(cause);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " " << success << " " << cause << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " " << success << " " << cause << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu, RilResponse *result)
+void RilRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU);
 
-    rr->mParcel.writeInt(2);
-    rr->mParcel.writeString(success ? "1" : "0");
-    rr->mParcel.writeString(ackPdu.c_str());
+    mParcel.writeInt(2);
+    mParcel.writeString(success ? "1" : "0");
+    mParcel.writeString(ackPdu.c_str());
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ' ' << success << " [" + ackPdu + ']' << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ' ' << success << " [" + ackPdu + ']' << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
 void RilRequest::iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
-                       std::string data, std::string pin2, RilResponse *result)
+                       std::string data, std::string pin2)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SIM_IO,
-        result);
+    obtain(RIL_REQUEST_SIM_IO);
 
-    rr->mParcel.writeInt(command);
-    rr->mParcel.writeInt(fileid);
-    rr->mParcel.writeString(path.c_str());
-    rr->mParcel.writeInt(p1);
-    rr->mParcel.writeInt(p2);
-    rr->mParcel.writeInt(p3);
-    rr->mParcel.writeString(data.c_str());
-    rr->mParcel.writeString(pin2.c_str());
+    mParcel.writeInt(command);
+    mParcel.writeInt(fileid);
+    mParcel.writeString(path.c_str());
+    mParcel.writeInt(p1);
+    mParcel.writeInt(p2);
+    mParcel.writeInt(p3);
+    mParcel.writeString(data.c_str());
+    mParcel.writeString(pin2.c_str());
 
-    LOGV << serialString() + "> iccIO: " << rr->requestToString()
+    LOGD << requestidString(get_requestid()) + "> iccIO: " << commandidToString(get_commandid())
          << " 0x" << std::hex << command << " 0x" << fileid << " "
          << " path: " << path << "," << p1 << "," << p2 << "," << p3 << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getCLIR(RilResponse *result)
+void RilRequest::getCLIR()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_CLIR,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GET_CLIR);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setCLIR(int clirMode, RilResponse *result)
+void RilRequest::setCLIR(int clirMode)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_CLIR,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_CLIR);
 
     // count ints
-    rr->mParcel.writeInt(1);
+    mParcel.writeInt(1);
 
-    rr->mParcel.writeInt(clirMode);
+    mParcel.writeInt(clirMode);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " " << clirMode << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " " << clirMode << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::queryCallWaiting(int serviceClass, RilResponse *result)
+void RilRequest::queryCallWaiting(int serviceClass)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_CALL_WAITING,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_QUERY_CALL_WAITING);
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(serviceClass);
+    mParcel.writeInt(1);
+    mParcel.writeInt(serviceClass);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " " + serviceClass << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " " + serviceClass << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setCallWaiting(bool enable, int serviceClass, RilResponse *result)
+void RilRequest::setCallWaiting(bool enable, int serviceClass)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_CALL_WAITING,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_CALL_WAITING);
 
-    rr->mParcel.writeInt(2);
-    rr->mParcel.writeInt(enable ? 1 : 0);
-    rr->mParcel.writeInt(serviceClass);
+    mParcel.writeInt(2);
+    mParcel.writeInt(enable ? 1 : 0);
+    mParcel.writeInt(serviceClass);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " " << enable << ", " << serviceClass << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " " << enable << ", " << serviceClass << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setNetworkSelectionModeAutomatic(RilResponse *result)
+void RilRequest::setNetworkSelectionModeAutomatic()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setNetworkSelectionModeManual(std::string operatorNumeric, RilResponse *result)
+void RilRequest::setNetworkSelectionModeManual(std::string operatorNumeric)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " " + operatorNumeric << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " " + operatorNumeric << ENDL;
 
-    rr->mParcel.writeString(operatorNumeric.c_str());
+    mParcel.writeString(operatorNumeric.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getNetworkSelectionMode(RilResponse *result)
+void RilRequest::getNetworkSelectionMode()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getAvailableNetworks(RilResponse *result)
+void RilRequest::getAvailableNetworks()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_AVAILABLE_NETWORKS,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_QUERY_AVAILABLE_NETWORKS);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
 void RilRequest::setCallForward(int action, int cfReason, int serviceClass,
-                                std::string number, int timeSeconds, RilResponse *result)
+                                std::string number, int timeSeconds)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_CALL_FORWARD,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_CALL_FORWARD);
 
-    rr->mParcel.writeInt(action);
-    rr->mParcel.writeInt(cfReason);
-    rr->mParcel.writeInt(serviceClass);
-    rr->mParcel.writeInt(number.length());
-    rr->mParcel.writeString(number.c_str());
-    rr->mParcel.writeInt(timeSeconds);
+    mParcel.writeInt(action);
+    mParcel.writeInt(cfReason);
+    mParcel.writeInt(serviceClass);
+    mParcel.writeInt(number.length());
+    mParcel.writeString(number.c_str());
+    mParcel.writeInt(timeSeconds);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " "
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " "
          << action + " " << cfReason << " " << serviceClass << timeSeconds << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
 void RilRequest::queryCallForwardStatus(int cfReason, int serviceClass,
-                                        std::string number, RilResponse *result)
+                                        std::string number)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_CALL_FORWARD_STATUS,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_QUERY_CALL_FORWARD_STATUS);
 
-    rr->mParcel.writeInt(2); // 2 is for query action, not in used anyway
-    rr->mParcel.writeInt(cfReason);
-    rr->mParcel.writeInt(serviceClass);
-    rr->mParcel.writeInt(number.length());
-    rr->mParcel.writeString(number.c_str());
-    rr->mParcel.writeInt(0);
+    mParcel.writeInt(2); // 2 is for query action, not in used anyway
+    mParcel.writeInt(cfReason);
+    mParcel.writeInt(serviceClass);
+    mParcel.writeInt(number.length());
+    mParcel.writeString(number.c_str());
+    mParcel.writeInt(0);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " "
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " "
          << cfReason << " " << serviceClass << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::queryCLIP(RilResponse *result)
+void RilRequest::queryCLIP()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_CLIP,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_QUERY_CLIP);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getBasebandVersion(RilResponse *result)
+void RilRequest::getBasebandVersion()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_BASEBAND_VERSION,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_BASEBAND_VERSION);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::queryFacilityLock(std::string facility, std::string password, int serviceClass,
-                                   RilResponse *response)
+void RilRequest::queryFacilityLock(std::string facility, std::string password, int serviceClass)
 {
-    queryFacilityLockForApp(facility, password, serviceClass, "", response);
+    queryFacilityLockForApp(facility, password, serviceClass, "");
 }
 
-void RilRequest::queryFacilityLockForApp(std::string facility, std::string password, int serviceClass, std::string appId,
-                                         RilResponse *result)
+void RilRequest::queryFacilityLockForApp(std::string facility, std::string password,
+                                         int serviceClass, std::string appId)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_FACILITY_LOCK,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_QUERY_FACILITY_LOCK);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
     // count strings
-    rr->mParcel.writeInt(4);
+    mParcel.writeInt(4);
 
-    rr->mParcel.writeString(facility.c_str());
-    rr->mParcel.writeString(password.c_str());
+    mParcel.writeString(facility.c_str());
+    mParcel.writeString(password.c_str());
 
-    rr->mParcel.writeString(std::to_string(serviceClass).c_str());
-    rr->mParcel.writeString(appId.c_str());
+    mParcel.writeString(std::to_string(serviceClass).c_str());
+    mParcel.writeString(appId.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
 void RilRequest::setFacilityLock(std::string facility, bool lockState, std::string password,
-                                 int serviceClass, RilResponse *response)
+                                 int serviceClass)
 {
-    setFacilityLockForApp(facility, lockState, password, serviceClass, "", response);
+    setFacilityLockForApp(facility, lockState, password, serviceClass, "");
 }
 
 void RilRequest::setFacilityLockForApp(std::string facility, bool lockState, std::string password,
-                                       int serviceClass, std::string appId, RilResponse *result)
+                                       int serviceClass, std::string appId)
 {
+    std::unique_lock<std::mutex> _lk(mRequestLock);
     std::string lockString;
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_FACILITY_LOCK,
-        result);
+    obtain(RIL_REQUEST_SET_FACILITY_LOCK);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
     // count strings
-    rr->mParcel.writeInt(5);
+    mParcel.writeInt(5);
 
-    rr->mParcel.writeString(facility.c_str());
+    mParcel.writeString(facility.c_str());
     lockString = (lockState) ? "1" : "0";
-    rr->mParcel.writeString(lockString.c_str());
-    rr->mParcel.writeString(password.c_str());
-    rr->mParcel.writeString(std::to_string(serviceClass).c_str());
-    rr->mParcel.writeString(appId.c_str());
+    mParcel.writeString(lockString.c_str());
+    mParcel.writeString(password.c_str());
+    mParcel.writeString(std::to_string(serviceClass).c_str());
+    mParcel.writeString(appId.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::sendUSSD(std::string ussdString, RilResponse *result)
+void RilRequest::sendUSSD(std::string ussdString)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SEND_USSD,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SEND_USSD);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " " + ussdString << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " " + ussdString << ENDL;
 
-    rr->mParcel.writeString(ussdString.c_str());
+    mParcel.writeString(ussdString.c_str());
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::cancelPendingUssd(RilResponse *result)
+void RilRequest::cancelPendingUssd()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_CANCEL_USSD,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_CANCEL_USSD);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::resetRadio(RilResponse *result)
+void RilRequest::resetRadio()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_RESET_RADIO,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_RESET_RADIO);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-// void RilRequest::invokeOemRilRequestRaw(uint8_t *data, RilResponse *result)
+// void RilRequest::invokeOemRilRequestRaw(uint8_t *data)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//               RIL_REQUEST_OEM_HOOK_RAW,
+//     obtain(//               RIL_REQUEST_OEM_HOOK_RAW,
 //               result);
 
-//     LOGV << rr->serialString() + "> " << rr->requestToString() << "[" + IccUtils.bytesToHexString(data) + "]" << ENDL;
+//     LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << "[" + IccUtils.bytesToHexString(data) + "]" << ENDL;
 
-//     rr->mParcel.writeByteArray(data);
-
-//     RILREQUEST::send(rr);
+//     mParcel.writeByteAthisay(data);
+//     if (!send(this)){
 //     mResponse = result;
 // }
 
-// void RilRequest::invokeOemRilRequestStrings(std::string[] strings, RilResponse *response)
+// void RilRequest::invokeOemRilRequestStrings(std::string[] strings)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//                 RIL_REQUEST_OEM_HOOK_STRINGS, response);
+//     obtain(//                 RIL_REQUEST_OEM_HOOK_STRINGS);
 
-//     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+//     LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-//     rr->mParcel.writeStringArray(std::strings);
-
-//     RILREQUEST::send(rr);
+//     mParcel.writeStringAthisay(std::strings);
+//     if (!send(this)){
 //     mResponse = result;
 // }
 
@@ -1585,279 +2186,393 @@ void RilRequest::resetRadio(RilResponse *result)
  * @param bandMode one of BM_*_BAND
  * @param response is callback message
  */
-void RilRequest::setBandMode(int bandMode, RilResponse *result)
+void RilRequest::setBandMode(int bandMode)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_BAND_MODE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_BAND_MODE);
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(bandMode);
+    mParcel.writeInt(1);
+    mParcel.writeInt(bandMode);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " " << bandMode << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " " << bandMode << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
 /**
- * Query the list of band mode supported by RF.
+ * Query the list of band mode supported by 
+ * std::unique_lock<std::mutex> _lk(mRequestLock);RF.
  *
  * @param response is callback message
  *        ((AsyncResult)response.obj).result  is an int[] with every
  *        element representing one avialable BM_*_BAND
  */
-void RilRequest::queryAvailableBandMode(RilResponse *result)
+void RilRequest::queryAvailableBandMode()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::sendTerminalResponse(std::string contents, RilResponse *result)
+void RilRequest::sendTerminalResponse(std::string contents)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeString(contents.c_str());
-    RILREQUEST::send(rr);
+    mParcel.writeString(contents.c_str());
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
 
-    mResponse = result;
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::sendEnvelope(std::string contents, RilResponse *result)
+void RilRequest::sendEnvelope(std::string contents)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    rr->mParcel.writeString(contents.c_str());
-    RILREQUEST::send(rr);
+    mParcel.writeString(contents.c_str());
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
 
-    mResponse = result;
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::sendEnvelopeWithStatus(std::string contents, RilResponse *result)
+void RilRequest::sendEnvelopeWithStatus(std::string contents)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << '[' + contents + ']' << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << '[' + contents + ']' << ENDL;
 
-    rr->mParcel.writeString(contents.c_str());
-    RILREQUEST::send(rr);
+    mParcel.writeString(contents.c_str());
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
 
-    mResponse = result;
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
 // void RilRequest::handleCallSetupRequestFromSim(
-//     bool accept, RilResponse *result)
+//     bool accept)
 // {
 
-//     RilRequest *rr = RILREQUEST::obtain(
-//         RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM,
+//     obtain(//         RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM,
 //         result);
 
-//     LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+//     LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
 //     int[] param = new(std::nothrow) int[1];
 //     param[0] = accept ? 1 : 0;
-//     rr->mParcel.writeIntArray(param);
-//     RILREQUEST::send(rr);
-
+//     mParcel.writeIntthisay(param);
+//     if (!send(this)){
 //     mResponse = result;
 // }
 
-// void RilRequest::setPreferredNetworkType(int networkType, RilResponse *result)
+// void RilRequest::setPrefethisedNetworkType(int networkType)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//         RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE,
+//     obtain(//         RIL_REQUEST_SET_PREFEthisED_NETWORK_TYPE,
 //         result);
 
-//     rr->mParcel.writeInt(1);
-//     rr->mParcel.writeInt(networkType);
+//     mParcel.writeInt(1);
+//     mParcel.writeInt(networkType);
 
-//     mSetPreferredNetworkType = networkType;
-//     mPreferredNetworkType = networkType;
+//     mSetPrefethisedNetworkType = networkType;
+//     mPrefethisedNetworkType = networkType;
 
-//         LOGV << rr->serialString() + "> " << rr->requestToString() <<  " : " + networkType);
-
-//         RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) <<  " : " + networkType);
+//         if (!send(this)){
 //         mResponse = result;
 // }
 
-void RilRequest::getPreferredNetworkType(RilResponse *result)
+void RilRequest::getPreferredNetworkType()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getNeighboringCids(RilResponse *result)
+void RilRequest::getNeighboringCids()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_NEIGHBORING_CELL_IDS,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GET_NEIGHBORING_CELL_IDS);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setLocationUpdates(bool enable, RilResponse *result)
+void RilRequest::setLocationUpdates(bool enable)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_LOCATION_UPDATES,
-        result);
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(enable ? 1 : 0);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_LOCATION_UPDATES);
+    mParcel.writeInt(1);
+    mParcel.writeInt(enable ? 1 : 0);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ": " << enable << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ": " << enable << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getSmscAddress(RilResponse *result)
+void RilRequest::getSmscAddress()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GET_SMSC_ADDRESS,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GET_SMSC_ADDRESS);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::setSmscAddress(std::string address, RilResponse *result)
+void RilRequest::setSmscAddress(std::string address)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_SET_SMSC_ADDRESS,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_SET_SMSC_ADDRESS);
 
-    rr->mParcel.writeString(address.c_str());
+    mParcel.writeString(address.c_str());
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << " : " + address << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << " : " + address << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::reportSmsMemoryStatus(bool available, RilResponse *result)
+void RilRequest::reportSmsMemoryStatus(bool available)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_REPORT_SMS_MEMORY_STATUS,
-        result);
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(available ? 1 : 0);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_REPORT_SMS_MEMORY_STATUS);
+    mParcel.writeInt(1);
+    mParcel.writeInt(available ? 1 : 0);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ": " << available << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ": " << available << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::reportStkServiceIsRunning(RilResponse *result)
+void RilRequest::reportStkServiceIsRunning()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-void RilRequest::getGsmBroadcastConfig(RilResponse *result)
+void RilRequest::getGsmBroadcastConfig()
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GSM_GET_BROADCAST_CONFIG,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GSM_GET_BROADCAST_CONFIG);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
-// void RilRequest::setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config, RilResponse *result)
+// void RilRequest::setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//           RIL_REQUEST_GSM_SET_BROADCAST_CONFIG,
+//     obtain(//           RIL_REQUEST_GSM_SET_BROADCAST_CONFIG,
 //           result);
 
 //     int numOfConfig = config.length;
-//     rr->mParcel.writeInt(numOfConfig);
+//     mParcel.writeInt(numOfConfig);
 
 //     for (int i = 0; i < numOfConfig; i++)
 //     {
-//         rr->mParcel.writeInt(config[i].getFromServiceId());
-//         rr->mParcel.writeInt(config[i].getToServiceId());
-//         rr->mParcel.writeInt(config[i].getFromCodeScheme());
-//         rr->mParcel.writeInt(config[i].getToCodeScheme());
-//         rr->mParcel.writeInt(config[i].isSelected() ? 1 : 0);
+//         mParcel.writeInt(config[i].getFromServiceId());
+//         mParcel.writeInt(config[i].getToServiceId());
+//         mParcel.writeInt(config[i].getFromCodeScheme());
+//         mParcel.writeInt(config[i].getToCodeScheme());
+//         mParcel.writeInt(config[i].isSelected() ? 1 : 0);
 //     }
 
 //     {
-//         LOGV << rr->serialString() + "> " << rr->requestToString() <<  " with " + numOfConfig + " configs : ");
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) <<  " with " + numOfConfig + " configs : ");
 //         for (int i = 0; i < numOfConfig; i++)
 //         {
 //             riljLog(config[i].toString());
 //         }
 //     }
-
-//     RILREQUEST::send(rr);
+//     if (!send(this)){
 //     mResponse = result;
 // }
 
-void RilRequest::setGsmBroadcastActivation(bool activate, RilResponse *result)
+void RilRequest::setGsmBroadcastActivation(bool activate)
 {
-    RilRequest *rr = RILREQUEST::obtain(
-        RIL_REQUEST_GSM_BROADCAST_ACTIVATION,
-        result);
+    std::unique_lock<std::mutex> _lk(mRequestLock);
+    obtain(RIL_REQUEST_GSM_BROADCAST_ACTIVATION);
 
-    rr->mParcel.writeInt(1);
-    rr->mParcel.writeInt(activate ? 0 : 1);
+    mParcel.writeInt(1);
+    mParcel.writeInt(activate ? 0 : 1);
 
-    LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
+    LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
 
-    RILREQUEST::send(rr);
-    mResponse = result;
+    if (!send(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+
+    if (mRequestcond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout)
+    {
+        LOGE << requestidString(get_requestid()) << "> "
+             << commandidToString(get_commandid()) << " timeout" << ENDL;
+    }
+    mDeviceMgr->detach(this);
 }
 
 // //***** Private Methods
-
 // private
 // void sendScreenState(bool on)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//         RIL_REQUEST_SCREEN_STATE, null);
-//     rr->mParcel.writeInt(1);
-//     rr->mParcel.writeInt(on ? 1 : 0);
-
+//     obtain(//         RIL_REQUEST_SCREEN_STATE, null);
+//     mParcel.writeInt(1);
+//     mParcel.writeInt(on ? 1 : 0);
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() <<  ": " + on);
-
-// RILREQUEST::send(rr);
+//         LOGD << equestidString(get_requestid()) + "> " << commandidToString(get_commandid()) <<  ": " + on);
+// if (!send(this)){
 // mResponse = result;
 // }
 
@@ -1865,23 +2580,21 @@ void RilRequest::setGsmBroadcastActivation(bool activate, RilResponse *result)
 // public
 // void getDeviceIdentity(RilResponse *response)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_DEVICE_IDENTITY, response);
+//     obtain(IL_REQUEST_DEVICE_IDENTITY);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 
 // public
 // void getCDMASubscription(RilResponse *response)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CDMA_SUBSCRIPTION, response);
+//     obtain(IL_REQUEST_CDMA_SUBSCRIPTION);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 
 // void setPhoneType(int phoneType)
@@ -1897,49 +2610,43 @@ void RilRequest::setGsmBroadcastActivation(bool activate, RilResponse *result)
 // public
 // void queryCdmaRoamingPreference(RilResponse *response)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//         RILConstants.RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE, response);
+//     obtain(//         RILConstants.RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 
 // /**
 //      * {@inheritDoc}
 //      */
 // public
-// void setCdmaRoamingPreference(int cdmaRoamingType, RilResponse *response)
+// void setCdmaRoamingPreference(int cdmaRoamingType)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//         RILConstants.RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE, response);
+//     obtain(//         RILConstants.RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE);
 
-//     rr.mp.writeInt(1);
-//     rr.mp.writeInt(cdmaRoamingType);
+//     this.mp.writeInt(1);
+//     this.mp.writeInt(cdmaRoamingType);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + cdmaRoamingType);
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL+ " : " + cdmaRoamingType);
+//     if (!send(this)){
 // }
 
 // /**
 //      * {@inheritDoc}
 //      */
 // public
-// void setCdmaSubscriptionSource(int cdmaSubscription, RilResponse *response)
+// void setCdmaSubscriptionSource(int cdmaSubscription)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//         RILConstants.RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE, response);
+//     obtain(//         RILConstants.RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE);
 
-//     rr.mp.writeInt(1);
-//     rr.mp.writeInt(cdmaSubscription);
+//     this.mp.writeInt(1);
+//     this.mp.writeInt(cdmaSubscription);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + cdmaSubscription);
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL+ " : " + cdmaSubscription);
+//     if (!send(this)){
 // }
 
 // /**
@@ -1947,13 +2654,11 @@ void RilRequest::setGsmBroadcastActivation(bool activate, RilResponse *result)
 //      */
 // void getCdmaSubscriptionSource(RilResponse *response)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//         RILConstants.RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE, response);
+//     obtain(//         RILConstants.RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 
 // /**
@@ -1962,86 +2667,78 @@ void RilRequest::setGsmBroadcastActivation(bool activate, RilResponse *result)
 // public
 // void queryTTYMode(RilResponse *response)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//         RILConstants.RIL_REQUEST_QUERY_TTY_MODE, response);
+//     obtain(//         RILConstants.RIL_REQUEST_QUERY_TTY_MODE);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 
 // /**
 //      * {@inheritDoc}
 //      */
 // public
-// void setTTYMode(int ttyMode, RilResponse *response)
+// void setTTYMode(int ttyMode)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(
-//         RILConstants.RIL_REQUEST_SET_TTY_MODE, response);
+//     obtain(//         RILConstants.RIL_REQUEST_SET_TTY_MODE);
 
-//     rr.mp.writeInt(1);
-//     rr.mp.writeInt(ttyMode);
+//     this.mp.writeInt(1);
+//     this.mp.writeInt(ttyMode);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + ttyMode);
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL+ " : " + ttyMode);
+//     if (!send(this)){
 // }
 
 // /**
 //      * {@inheritDoc}
 //      */
 // public
-// void sendCDMAFeatureCode(String FeatureCode, RilResponse *response)
+// void sendCDMAFeatureCode(String FeatureCode)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CDMA_FLASH, response);
+//     obtain(IL_REQUEST_CDMA_FLASH);
 
-//     rr.mp.writeString(FeatureCode);
+//     this.mp.writeString(FeatureCode);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ " : " + FeatureCode);
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL+ " : " + FeatureCode);
+//     if (!send(this)){
 // }
 
 // public
 // void getCdmaBroadcastConfig(RilResponse *response)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CDMA_GET_BROADCAST_CONFIG, response);
-
-//     RILREQUEST::send(rr);
+//     obtain(IL_REQUEST_CDMA_GET_BROADCAST_CONFIG);
+//     if (!send(this)){
 // }
 
-// // TODO: Change the configValuesArray to a RIL_BroadcastSMSConfig
+// // TODO: Change the configValuesAthisay to a RIL_BroadcastSMSConfig
 // public
-// void setCdmaBroadcastConfig(int[] configValuesArray, RilResponse *response)
+// void setCdmaBroadcastConfig(int[] configValuesAthisay)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG, response);
+//     obtain(IL_REQUEST_CDMA_SET_BROADCAST_CONFIG);
 
-//     for (int i = 0; i < configValuesArray.length; i++)
+//     for (int i = 0; i < configValuesAthisay.length; i++)
 //     {
-//         rr.mp.writeInt(configValuesArray[i]);
+//         this.mp.writeInt(configValuesAthisay[i]);
 //     }
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 
 // public
-// void setCdmaBroadcastActivation(boolean activate, RilResponse *response)
+// void setCdmaBroadcastActivation(boolean activate)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_CDMA_BROADCAST_ACTIVATION, response);
+//     obtain(IL_REQUEST_CDMA_BROADCAST_ACTIVATION);
 
-//     rr.mp.writeInt(1);
-//     rr.mp.writeInt(activate ? 0 : 1);
+//     this.mp.writeInt(1);
+//     this.mp.writeInt(activate ? 0 : 1);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 
 // /**
@@ -2050,364 +2747,364 @@ void RilRequest::setGsmBroadcastActivation(bool activate, RilResponse *result)
 // public
 // void exitEmergencyCallbackMode(RilResponse *response)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE, response);
+//     obtain(IL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 
 // public
-// void requestIsimAuthentication(String nonce, RilResponse *response)
+// void requestIsimAuthentication(String nonce)
 // {
-//     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_ISIM_AUTHENTICATION, response);
+//     obtain(IL_REQUEST_ISIM_AUTHENTICATION);
 
-//     rr.mp.writeString(nonce);
+//     this.mp.writeString(nonce);
 
 //
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL;
-
-//     RILREQUEST::send(rr);
+//         LOGD << requestidString(get_requestid()) + "> " << commandidToString(get_commandid()) << ENDL;
+//     if (!send(this)){
 // }
 // }
 
 void RilRequest::processSolicited(Parcel &p)
 {
-    int error = p.readInt();
+    int ethisor = p.readInt();
 
-    mResponse->setResponseID(get_commandid());
-    mResponse->setResponseURCInfo(false);
+    RilResponse resp;
 
-    if (error == 0 || p.dataAvail() > 0)
+    resp.setResponseID(get_commandid());
+    resp.setResponseURCInfo(false);
+
+    if (ethisor == 0 || p.dataAvail() > 0)
     {
         // either command succeeds or command fails but with data payload
-        LOGV << "response id: " << get_commandid() << ENDL;
+        LOGD << "response id: " << get_commandid() << ENDL;
         switch (get_commandid())
         {
         case RIL_REQUEST_GET_SIM_STATUS:
-            mResponse->responseIccCardStatus(p);
+            resp.responseIccCardStatus(p);
             return;
         case RIL_REQUEST_ENTER_SIM_PIN:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_ENTER_SIM_PUK:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_ENTER_SIM_PIN2:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_ENTER_SIM_PUK2:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_CHANGE_SIM_PIN:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_CHANGE_SIM_PIN2:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_GET_CURRENT_CALLS:
-            mResponse->responseCallList(p);
+            resp.responseCallList(p);
             return;
         case RIL_REQUEST_DIAL:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_GET_IMSI:
-            mResponse->responseString(p);
+            resp.responseString(p);
             return;
         case RIL_REQUEST_HANGUP:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CONFERENCE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_UDUB:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_LAST_CALL_FAIL_CAUSE:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_SIGNAL_STRENGTH:
-            mResponse->responseSignalStrength(p);
+            resp.responseSignalStrength(p);
             return;
         case RIL_REQUEST_VOICE_REGISTRATION_STATE:
-            mResponse->responseStrings(p);
+            resp.responseStrings(p);
             return;
         case RIL_REQUEST_DATA_REGISTRATION_STATE:
-            mResponse->responseStrings(p);
+            resp.responseStrings(p);
             return;
         case RIL_REQUEST_OPERATOR:
-            mResponse->responseStrings(p);
+            resp.responseStrings(p);
             return;
         case RIL_REQUEST_RADIO_POWER:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_DTMF:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_SEND_SMS:
-            mResponse->responseSMS(p);
+            resp.responseSMS(p);
             return;
         case RIL_REQUEST_SEND_SMS_EXPECT_MORE:
-            mResponse->responseSMS(p);
+            resp.responseSMS(p);
             return;
         case RIL_REQUEST_SETUP_DATA_CALL:
-            mResponse->responseSetupDataCall(p);
+            resp.responseSetupDataCall(p);
             return;
         case RIL_REQUEST_SIM_IO:
-            mResponse->responseICC_IO(p);
+            resp.responseICC_IO(p);
             return;
         case RIL_REQUEST_SEND_USSD:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CANCEL_USSD:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_GET_CLIR:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_SET_CLIR:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_QUERY_CALL_FORWARD_STATUS:
-            mResponse->responseCallForward(p);
+            resp.responseCallForward(p);
             return;
         case RIL_REQUEST_SET_CALL_FORWARD:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_QUERY_CALL_WAITING:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_SET_CALL_WAITING:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_SMS_ACKNOWLEDGE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_GET_IMEI:
-            mResponse->responseString(p);
+            resp.responseString(p);
             return;
         case RIL_REQUEST_GET_IMEISV:
-            mResponse->responseString(p);
+            resp.responseString(p);
             return;
         case RIL_REQUEST_ANSWER:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_DEACTIVATE_DATA_CALL:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_QUERY_FACILITY_LOCK:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_SET_FACILITY_LOCK:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_CHANGE_BARRING_PASSWORD:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_QUERY_AVAILABLE_NETWORKS:
-            mResponse->responseOperatorInfos(p);
+            resp.responseOperatorInfos(p);
             return;
         case RIL_REQUEST_DTMF_START:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_DTMF_STOP:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_BASEBAND_VERSION:
-            mResponse->responseString(p);
+            resp.responseString(p);
             return;
         case RIL_REQUEST_SEPARATE_CONNECTION:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_SET_MUTE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_GET_MUTE:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_QUERY_CLIP:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_DATA_CALL_LIST:
-            mResponse->responseDataCallList(p);
+            resp.responseDataCallList(p);
             return;
         case RIL_REQUEST_RESET_RADIO:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_OEM_HOOK_RAW:
-            mResponse->responseRaw(p);
+            resp.responseRaw(p);
             return;
         case RIL_REQUEST_OEM_HOOK_STRINGS:
-            mResponse->responseStrings(p);
+            resp.responseStrings(p);
             return;
         case RIL_REQUEST_SCREEN_STATE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_WRITE_SMS_TO_SIM:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_DELETE_SMS_ON_SIM:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_SET_BAND_MODE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_STK_GET_PROFILE:
-            mResponse->responseString(p);
+            resp.responseString(p);
             return;
         case RIL_REQUEST_STK_SET_PROFILE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND:
-            mResponse->responseString(p);
+            resp.responseString(p);
             return;
         case RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_EXPLICIT_CALL_TRANSFER:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE:
-            mResponse->responseGetPreferredNetworkType(p);
+            resp.responseGetPreferredNetworkType(p);
             return;
         case RIL_REQUEST_GET_NEIGHBORING_CELL_IDS:
-            mResponse->responseCellList(p);
+            resp.responseCellList(p);
             return;
         case RIL_REQUEST_SET_LOCATION_UPDATES:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_SET_TTY_MODE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_QUERY_TTY_MODE:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_CDMA_FLASH:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_BURST_DTMF:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_SEND_SMS:
-            mResponse->responseSMS(p);
+            resp.responseSMS(p);
             return;
         case RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_GSM_GET_BROADCAST_CONFIG:
-            mResponse->responseGmsBroadcastConfig(p);
+            resp.responseGmsBroadcastConfig(p);
             return;
         case RIL_REQUEST_GSM_SET_BROADCAST_CONFIG:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_GSM_BROADCAST_ACTIVATION:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_GET_BROADCAST_CONFIG:
-            mResponse->responseCdmaBroadcastConfig(p);
+            resp.responseCdmaBroadcastConfig(p);
             return;
         case RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_BROADCAST_ACTIVATION:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_VALIDATE_AND_WRITE_AKEY:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_SUBSCRIPTION:
-            mResponse->responseStrings(p);
+            resp.responseStrings(p);
             return;
         case RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_DEVICE_IDENTITY:
-            mResponse->responseStrings(p);
+            resp.responseStrings(p);
             return;
         case RIL_REQUEST_GET_SMSC_ADDRESS:
-            mResponse->responseString(p);
+            resp.responseString(p);
             return;
         case RIL_REQUEST_SET_SMSC_ADDRESS:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_REPORT_SMS_MEMORY_STATUS:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE:
-            mResponse->responseInts(p);
+            resp.responseInts(p);
             return;
         case RIL_REQUEST_ISIM_AUTHENTICATION:
-            mResponse->responseString(p);
+            resp.responseString(p);
             return;
         case RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU:
-            mResponse->responseVoid(p);
+            resp.responseVoid(p);
             return;
         case RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS:
-            mResponse->responseICC_IO(p);
+            resp.responseICC_IO(p);
             return;
         default:
-            LOGW << "currently not supported" << ENDL;
+            LOGW << "cuthisently not supported" << ENDL;
         }
     }
 }
@@ -2417,8 +3114,8 @@ void RilRequest::processUnsolicited(Parcel &p)
     int cmdid = p.readInt();
     RilResponse TMPResponse;
 
-    mResponse->setResponseID(cmdid);
-    mResponse->setResponseURCInfo(true);
+    // resp.setResponseID(cmdid);
+    // resp.setResponseURCInfo(true);
 
     // either command succeeds or command fails but with data payload
     switch (cmdid)
@@ -2599,7 +3296,7 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     else
         //     {
         //         if (RILJ_LOGD)
-        //             riljLog(" NEW_SMS_ON_SIM ERROR with wrong length " + smsIndex.length);
+        //             riljLog(" NEW_SMS_ON_SIM EthisOR with wrong length " + smsIndex.length);
         //     }
         //     break;
         // case RIL_UNSOL_ON_USSD:
@@ -2648,8 +3345,8 @@ void RilRequest::processUnsolicited(Parcel &p)
         // case RIL_UNSOL_SIGNAL_STRENGTH:
         //     // Note this is set to "verbose" because it happens
         //     // frequently
-        //     if (RILJ_LOGV)
-        //         unsljLogvRet(response, ret);
+        //     if (RILJ_LOGD)
+        //         unsljLOGDRet(response, ret);
 
         //     if (mSignalStrengthRegistrant != null)
         //     {
@@ -2753,7 +3450,7 @@ void RilRequest::processUnsolicited(Parcel &p)
 
         // case RIL_UNSOL_RESTRICTED_STATE_CHANGED:
         //     if (RILJ_LOGD)
-        //         unsljLogvRet(response, ret);
+        //         unsljLOGDRet(response, ret);
         //     if (mRestrictedStateRegistrant != null)
         //     {
         //         mRestrictedStateRegistrant.notifyRegistrant(
@@ -2838,11 +3535,11 @@ void RilRequest::processUnsolicited(Parcel &p)
         //     break;
 
         // case RIL_UNSOL_CDMA_INFO_REC:
-        //     ArrayList<CdmaInformationRecords> listInfoRecs;
+        //     AthisayList<CdmaInformationRecords> listInfoRecs;
 
         //     try
         //     {
-        //         listInfoRecs = (ArrayList<CdmaInformationRecords>)ret;
+        //         listInfoRecs = (AthisayList<CdmaInformationRecords>)ret;
         //     }
         //     catch (ClassCastException e)
         //     {
@@ -2860,7 +3557,7 @@ void RilRequest::processUnsolicited(Parcel &p)
 
         // case RIL_UNSOL_OEM_HOOK_RAW:
         //     if (RILJ_LOGD)
-        //         unsljLogvRet(response, IccUtils.bytesToHexString((byte[])ret));
+        //         unsljLOGDRet(response, IccUtils.bytesToHexString((byte[])ret));
         //     if (mUnsolOemHookRawRegistrant != null)
         //     {
         //         mUnsolOemHookRawRegistrant.notifyRegistrant(new AsyncResult(null, ret, null));
@@ -2869,7 +3566,7 @@ void RilRequest::processUnsolicited(Parcel &p)
 
         // case RIL_UNSOL_RINGBACK_TONE:
         //     if (RILJ_LOGD)
-        //         unsljLogvRet(response, ret);
+        //         unsljLOGDRet(response, ret);
         //     if (mRingbackToneRegistrants != null)
         //     {
         //         bool playtone = (((int[])ret)[0] == 1);
@@ -2929,7 +3626,7 @@ void RilRequest::processUnsolicited(Parcel &p)
 
         //     // Initial conditions
         //     setRadioPower(false, null);
-        //     setPreferredNetworkType(mPreferredNetworkType, null);
+        //     setPrefethisedNetworkType(mPrefethisedNetworkType, null);
         //     setCdmaSubscriptionSource(mCdmaSubscription, null);
         //     notifyRegistrantsRilConnectionChanged(((int[])ret)[0]);
         //     break;

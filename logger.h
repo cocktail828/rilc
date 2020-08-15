@@ -27,7 +27,7 @@ static std::string severity_str[] = {
     [CRIT] = "CRIT",       /* critical conditions */
     [ERROR] = "ERROR",     /* error conditions */
     [WARNING] = "WARNING", /* warning conditions */
-    [NOTICE] = "NOTICE,",  /* normal but significant condition */
+    [NOTICE] = "NOTICE",   /* normal but significant condition */
     [INFO] = "INFO",       /* informational */
     [DEBUG] = "DEBUG",     /* debug-level messages */
 };
@@ -135,19 +135,22 @@ public:
 
         obuf += ss.str();
 
-        /* syslog */
-        if (m_sync_syslog)
-            syslog(LOG_USER | m_severity, "%s", obuf.c_str());
-
-        /* stdout/stderr */
-        if (m_sync_stdout)
-            std::cerr << obuf << os;
-
-        if (m_sync_file)
+        if (m_log_level >= m_severity)
         {
-            std::ofstream fout(m_logfile, std::ios::app);
-            fout.write(obuf.c_str(), obuf.length());
-            fout.close();
+            /* syslog */
+            if (m_sync_syslog)
+                syslog(LOG_USER | m_severity, "%s", obuf.c_str());
+
+            /* stdout/stderr */
+            if (m_sync_stdout)
+                std::cerr << obuf << os;
+
+            if (m_sync_file)
+            {
+                std::ofstream fout(m_logfile, std::ios::app);
+                fout.write(obuf.c_str(), obuf.length());
+                fout.close();
+            }
         }
 
         ss.str("");
@@ -177,32 +180,27 @@ public:
 
 #ifndef NDEBUG
 #define LOG(v) Logger::Instance(v, __FILE__, __LINE__, __func__)
-#define LOGI Logger::Instance(Severity::INFO, __FILE__, __LINE__, __func__)
-#define LOGV Logger::Instance(Severity::NOTICE, __FILE__, __LINE__, __func__)
 #define LOGD Logger::Instance(Severity::DEBUG, __FILE__, __LINE__, __func__)
+#define LOGI Logger::Instance(Severity::INFO, __FILE__, __LINE__, __func__)
 #define LOGW Logger::Instance(Severity::WARNING, __FILE__, __LINE__, __func__)
 #define LOGE Logger::Instance(Severity::ERROR, __FILE__, __LINE__, __func__)
 
-#define LOGFI(a, v...) Logger::Instance(Severity::INFO, __FILE__, __LINE__, __func__)(a, ##v)
-#define LOGFV(a, v...) Logger::Instance(Severity::NOTICE, __FILE__, __LINE__, __func__)(a, ##v)
 #define LOGFD(a, v...) Logger::Instance(Severity::DEBUG, __FILE__, __LINE__, __func__)(a, ##v)
+#define LOGFI(a, v...) Logger::Instance(Severity::INFO, __FILE__, __LINE__, __func__)(a, ##v)
 #define LOGFW(a, v...) Logger::Instance(Severity::WARNING, __FILE__, __LINE__, __func__)(a, ##v)
 #define LOGFE(a, v...) Logger::Instance(Severity::ERROR, __FILE__, __LINE__, __func__)(a, ##v)
 
 #else
 #define LOG(v) Logger::Instance(v)
-#define LOGI Logger::Instance()
-#define LOGV Logger::Instance()
-#define LOGD Logger::Instance()
-#define LOGW Logger::Instance()
-#define LOGE Logger::Instance()
+#define LOGD Logger::Instance(Severity::DEBUG)
+#define LOGI Logger::Instance(Severity::INFO)
+#define LOGW Logger::Instance(Severity::WARNING)
+#define LOGE Logger::Instance(Severity::ERROR)
 
-#define LOGFI(a, v...) Logger::Instance()(a, ##v)
-#define LOGFV(a, v...) Logger::Instance()(a, ##v)
-#define LOGFD(a, v...) Logger::Instance()(a, ##v)
-#define LOGFW(a, v...) Logger::Instance()(a, ##v)
-#define LOGFE(a, v...) Logger::Instance()(a, ##v)
+#define LOGFD(a, v...) Logger::Instance(Severity::DEBUG)(a, ##v)
+#define LOGFI(a, v...) Logger::Instance(Severity::INFO)(a, ##v)
+#define LOGFW(a, v...) Logger::Instance(Severity::WARNING)(a, ##v)
+#define LOGFE(a, v...) Logger::Instance(Severity::ERROR)(a, ##v)
 #endif // NDEBUG
 
-#define LINE LOGI << __FILE__ << __LINE__ << ENDL
 #endif //__LOGGER
