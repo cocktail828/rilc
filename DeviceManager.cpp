@@ -9,29 +9,20 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <termio.h>
-#include <linux/usbdevice_fs.h>
-#include <linux/version.h>
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 20)
-#include <linux/usb/ch9.h>
-#else
-#include <linux/usb_ch9.h>
-#endif
 
 #include "logger.h"
 #include "DeviceManager.h"
 #include "ril_request.h"
 #include "parcel/parcel.h"
 
-static usb_handle handle;
-
-void poolRead(DeviceManager *args)
+void pollingRead(DeviceManager *args)
 {
     int epfd = epoll_create(10);
 
     epoll_event event;
-    event.data.fd = args->mHandle;
+    event.data.fd = args->mPollingHandle;
     event.events = EPOLLIN | EPOLLRDHUP;
-    epoll_ctl(epfd, EPOLL_CTL_ADD, args->mHandle, &event);
+    epoll_ctl(epfd, EPOLL_CTL_ADD, args->mPollingHandle, &event);
 
     std::thread::id mPollID = std::this_thread::get_id();
 
@@ -40,14 +31,19 @@ void poolRead(DeviceManager *args)
     do
     {
         args->mReady = true;
-        if (args->mQuitFlag)
-            break;
-
-        int num = epoll_wait(epfd, events, 10, 3000);
+        int num = epoll_wait(epfd, events, 10, 2000);
         if (num < 0)
-            break;
+        {
+            LOGE << "epoll_wait get error: " << strerror(errno) << ENDL;
+            goto quit_polling;
+        }
         else if (num == 0)
-            continue;
+        {
+            if (args->mQuitFlag)
+            {
+                goto quit_polling;
+            }
+        }
         else
         {
             for (int i = 0; i < num; i++)
@@ -67,9 +63,8 @@ void poolRead(DeviceManager *args)
 
                 if (events[i].events & EPOLLIN)
                 {
-#define MAX_RD_SIZE (8 * 1024)
                     int olen = 0;
-                    static uint8_t recvBuff[MAX_RD_SIZE]; // RIL message has max size of 8K
+                    static uint8_t recvBuff[MAX_RILD_DATA_SIZE]; // RIL message has max size of 8K
                     int length = 0;
 
                     // read message length
@@ -77,10 +72,10 @@ void poolRead(DeviceManager *args)
                     {
                         length = be32toh(length);
                         LOGD << "response length = " << length << ENDL;
-                        if (length > MAX_RD_SIZE)
+                        if (length > MAX_RILD_DATA_SIZE)
                         {
                             LOGE << "error, message lenth too long" << ENDL;
-                            length = MAX_RD_SIZE - 1;
+                            length = MAX_RILD_DATA_SIZE - 1;
                         }
                         // read message body
                         if (args->recvAsync(recvBuff, length, &olen))
@@ -101,14 +96,13 @@ quit_polling:
 }
 
 DeviceManager::DeviceManager(const char *d)
-    : mDevice(d), mQuitFlag(false),
-      mReady(false), mHandle(0)
+    : mDevice(d), mPollingHandle(0), mQuitFlag(false), mReady(false)
 {
 }
 
 DeviceManager::~DeviceManager()
 {
-    mHandle = 0;
+    mPollingHandle = 0;
     mReady = false;
 }
 
@@ -123,141 +117,15 @@ bool DeviceManager::isReady()
     return mReady;
 }
 
-int open_usbfs(const char *d)
-{
-    int fd = open(d, O_RDWR);
-    if (fd < 0)
-    {
-        LOGE << "fail to open usbfs " << d << ENDL;
-        return fd;
-    }
-
-    int ifc = 6;
-    if (ioctl(fd, USBDEVFS_CLAIMINTERFACE, &ifc))
-    {
-        LOGE << "usbfs fail to claim interface: " << ifc << ENDL;
-        close(fd);
-        return 0;
-    }
-    handle.desc = fd;
-    handle.ep_in = 0x87;
-    handle.ep_out = 0x06;
-    handle.ep_in_maxpkt = 1024;
-    handle.ep_out_maxpkt = 1024;
-    strcpy(handle.fname, d);
-
-    return fd;
-}
-
-int usb_close(usb_handle *h)
-{
-    int fd;
-    int ifc = 6;
-
-    fd = handle.desc;
-    handle.desc = -1;
-    if (fd >= 0)
-    {
-        ioctl(fd, USBDEVFS_RELEASEINTERFACE, &ifc);
-        close(fd);
-        fd = -1;
-    }
-
-    return 0;
-}
-
-#define MAX_USBFS_BULK_SIZE (16 * 1024)
-int usb_write(const void *_data, int len)
-{
-    unsigned char *data = (unsigned char *)_data;
-    unsigned count = 0;
-    struct usbdevfs_bulktransfer bulk;
-    int n;
-
-    if (handle.ep_out == 0 || handle.desc == -1)
-    {
-        return -1;
-    }
-
-    do
-    {
-        int xfer;
-        xfer = (len > MAX_USBFS_BULK_SIZE) ? MAX_USBFS_BULK_SIZE : len;
-
-        bulk.ep = handle.ep_out;
-        bulk.len = xfer;
-        bulk.data = data;
-        bulk.timeout = 0;
-
-        n = ioctl(handle.desc, USBDEVFS_BULK, &bulk);
-        if (n != xfer)
-        {
-            LOGFE("ERROR: n = %d, xfer = %d, errno = %d (%s)\n", n, xfer, errno, strerror(errno));
-            return -1;
-        }
-
-        count += xfer;
-        len -= xfer;
-        data += xfer;
-    } while (len > 0);
-
-    return count;
-}
-
-#define MAX_RETRIES 5
-int usb_read(void *_data, int len)
-{
-    unsigned char *data = (unsigned char *)_data;
-    unsigned count = 0;
-    struct usbdevfs_bulktransfer bulk;
-    int n, retry;
-
-    if (handle.ep_in == 0 || handle.desc == -1)
-    {
-        return -1;
-    }
-
-    while (len > 0)
-    {
-        int xfer = (len > MAX_USBFS_BULK_SIZE) ? MAX_USBFS_BULK_SIZE : len;
-
-        bulk.ep = handle.ep_in;
-        bulk.len = xfer;
-        bulk.data = data;
-        bulk.timeout = 0;
-        retry = 0;
-
-        do
-        {
-            LOGFI("[ usb read %d fd = %d], fname=%s\n", xfer, handle.desc, handle.fname);
-            n = ioctl(handle.desc, USBDEVFS_BULK, &bulk);
-            LOGFI("[ usb read %d ] = %d, fname=%s, Retry %d \n", xfer, n, handle.fname, retry);
-
-            if (n < 0)
-            {
-                LOGFE("ERROR: n = %d, errno = %d (%s)\n", n, errno, strerror(errno));
-                if (++retry > MAX_RETRIES)
-                    return -1;
-                sleep(1);
-            }
-        } while (n < 0);
-
-        count += n;
-        len -= n;
-        data += n;
-
-        if (n < xfer)
-        {
-            break;
-        }
-    }
-
-    return count;
-}
-
 static int open_tty(const char *d)
 {
     int fd = open(d, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (fd < 0)
+    {
+        LOGE << "fail to open " << d << " for " << strerror(errno) << ENDL;
+        return fd;
+    }
+
     struct termios tio;
     struct termios settings;
     int retval;
@@ -312,8 +180,6 @@ bool DeviceManager::openDevice()
     int fd;
     if (mDevice.find("socket") != std::string::npos)
         fd = open_unix_sock(mDevice.c_str());
-    else if (mDevice.find("/dev/bus/usb") != std::string::npos)
-        fd = open_usbfs(mDevice.c_str());
     else
         fd = open_tty(mDevice.c_str());
 
@@ -324,17 +190,18 @@ bool DeviceManager::openDevice()
     }
     LOGI << "open " << mDevice << " successfully, fd = " << fd << ENDL;
 
-    mHandle = fd;
+    mPollingHandle = fd;
     startPooling();
     return true;
 }
 
 bool DeviceManager::closeDevice()
 {
-    LOGD << "closeDevice fd = " << mHandle << ENDL;
-    /* close file descriper first, so polling thread will quit */
-    close(mHandle);
-    mHandle = 0;
+    LOGD << "closeDevice fd = " << mPollingHandle << ENDL;
+    /* close file descriper first, for we do not care the follwing messages */
+    close(mPollingHandle);
+    /* set quit flag so polling thread will quit */
+    mQuitFlag = true;
 
     LOGD << "closeDevice successfully" << ENDL;
     detachAll();
@@ -354,7 +221,7 @@ static void dump_msg(const void *data, int len, const char *direction)
     LOGD << "(" + std::to_string(len) + "): " + direction + " " << _msg << ENDL;
 }
 
-bool DeviceManager::sendAsync(const void *data, int len)
+int DeviceManager::sendAsync(const void *data, int len)
 {
     std::lock_guard<std::mutex> _lk(mRWLock);
 
@@ -363,8 +230,7 @@ bool DeviceManager::sendAsync(const void *data, int len)
 
     dump_msg(data, len, ">>>>>>");
 
-    // ssize_t ret = write(mHandle, data, len);
-    int ret = usb_write(data, len);
+    ssize_t ret = write(mPollingHandle, data, len);
     if (ret < 0)
     {
         LOGE << "send message failed" << ENDL;
@@ -373,7 +239,7 @@ bool DeviceManager::sendAsync(const void *data, int len)
     return true;
 }
 
-bool DeviceManager::recvAsync(void *data, int len, int *olen)
+int DeviceManager::recvAsync(void *data, int len, int *olen)
 {
     std::lock_guard<std::mutex> _lk(mRWLock);
 
@@ -382,8 +248,7 @@ bool DeviceManager::recvAsync(void *data, int len, int *olen)
     if (!mReady)
         return false;
 
-    // ssize_t ret = read(mHandle, data, len);
-    int ret = usb_read(data, len);
+    ssize_t ret = read(mPollingHandle, data, len);
     if (ret < 0)
     {
         LOGE << "recv message failed" << ENDL;
@@ -398,12 +263,8 @@ bool DeviceManager::recvAsync(void *data, int len, int *olen)
 
 int DeviceManager::startPooling()
 {
-    // std::thread pooling(poolRead, this);
-    // pooling.detach();
-    // return true;
-
-    mFuture = std::async(std::launch::async, [&] {
-        poolRead(this);
+    mPollingFuture = std::async(std::launch::async, [&] {
+        pollingRead(this);
         mReady = false;
         return 0;
     });
@@ -412,23 +273,21 @@ int DeviceManager::startPooling()
 
 int DeviceManager::stopPooling()
 {
-    mQuitFlag = true;
-    // TODO;
-
     const int max_wait = 10;
     int wait = 0;
     while (wait < max_wait)
     {
-        auto status = mFuture.wait_for(std::chrono::seconds(1));
+        auto status = mPollingFuture.wait_for(std::chrono::seconds(1));
         if (status == std::future_status::ready)
         {
-            auto ret = mFuture.get();
+            auto ret = mPollingFuture.get();
             LOGI << "polling thread exit with code " << ret << ENDL;
             break;
         }
-        LOGI << "stopPooling try time = " << wait << ENDL;
+        LOGI << "stop pooling try time = " << wait << ENDL;
         wait++;
     }
+    LOGI << "polling thread exit " << ENDL;
     return true;
 }
 
@@ -456,15 +315,9 @@ void DeviceManager::processResponse(void *data, size_t len)
     {
         LOGD << "process socilited message" << ENDL;
         /* find the observer and notice him */
-        int requestid = p.readInt();
-        for (auto o : mObservers)
-        {
-            if (o->get_requestid() == requestid)
-            {
-                o->update(p);
-                detach(o);
-            }
-        }
+        int rid = p.readInt();
+
+        notify(rid, p);
     }
     else
     {

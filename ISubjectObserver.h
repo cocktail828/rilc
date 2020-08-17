@@ -26,8 +26,6 @@ class ISubject
 {
 private:
     std::mutex mListLock;
-
-protected:
     std::vector<IObserver *> mObservers;
 
 public:
@@ -74,6 +72,22 @@ public:
 
         mObservers.clear();
         LOGD << "removing all observers finished" << ENDL;
+    }
+
+    void notify(int rid, Parcel &p)
+    {
+        std::lock_guard<std::mutex> _lk(mListLock);
+
+        LOGD << "try to find and notify observer, rid " << rid << ENDL;
+        for (auto iter = mObservers.begin(); iter != mObservers.end();)
+        {
+            IObserver *o = *iter;
+            if (o->get_requestid() == rid)
+            {
+                o->update(p);
+                mObservers.erase(iter);
+            }
+        }
     }
 };
 

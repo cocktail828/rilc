@@ -299,13 +299,10 @@ bool RilRequest::init(const char *device)
  */
 bool RilRequest::uninit()
 {
-    if (mDeviceMgr)
+    if (mDeviceMgr && mDeviceMgr->closeDevice())
     {
-        if (mDeviceMgr->closeDevice())
-        {
-            delete mDeviceMgr;
-            return true;
-        }
+        delete mDeviceMgr;
+        return true;
     }
 
     return false;

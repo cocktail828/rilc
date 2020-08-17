@@ -6,19 +6,19 @@
 
 #include "ISubjectObserver.h"
 
-class DeviceManager final : public ISubject
+#define MAX_RILD_DATA_SIZE (8 * 1024)
+class DeviceManager : public ISubject
 {
     static const int RESPONSE_SOLICITED = 0;
     static const int RESPONSE_UNSOLICITED = 1;
 
 private:
     std::mutex mRWLock;
-    std::mutex mListLock;
+    std::future<int> mPollingFuture;
     std::string mDevice;
-    std::future<int> mFuture;
+    int mPollingHandle;
     bool mQuitFlag;
     bool mReady;
-    int mHandle;
 
 public:
     explicit DeviceManager(const char *d);
@@ -33,28 +33,18 @@ public:
 
     bool closeDevice();
 
-    bool sendAsync(const void *data, int len);
+    int sendAsync(const void *data, int len);
+
+    int recvAsync(void *data, int len, int *olen);
 
     int startPooling();
 
     int stopPooling();
 
-    friend void poolRead(DeviceManager *args);
+    friend void pollingRead(DeviceManager *args);
 
 private:
-    bool recvAsync(void *data, int len, int *olen);
-
     void processResponse(void *data, size_t len);
 };
-
-typedef struct
-{
-    char fname[64];
-    int desc;
-    unsigned char ep_in;
-    unsigned char ep_out;
-    unsigned short ep_in_maxpkt;
-    unsigned short ep_out_maxpkt;
-} usb_handle;
 
 #endif //__DEVICEMANAGER
