@@ -2494,7 +2494,7 @@ void RilRequest::processUnsolicited(Parcel &p)
     // resp.setResponseID(cmdid);
     // resp.setResponseURCInfo(true);
 
-    LOGD << "RESP< " << RilResponse::responseToString(cmdid) << ENDL;
+    LOGD << "RESP < " << RilResponse::responseToString(cmdid) << ENDL;
     // either command succeeds or command fails but with data payload
     switch (cmdid)
     {

@@ -8,11 +8,21 @@
 #include <linux/un.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <termio.h>
+#include <linux/usbdevice_fs.h>
+#include <linux/version.h>
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 20)
+#include <linux/usb/ch9.h>
+#else
+#include <linux/usb_ch9.h>
+#endif
 
 #include "logger.h"
 #include "DeviceManager.h"
 #include "ril_request.h"
 #include "parcel/parcel.h"
+
+static usb_handle handle;
 
 void poolRead(DeviceManager *args)
 {
@@ -57,11 +67,27 @@ void poolRead(DeviceManager *args)
 
                 if (events[i].events & EPOLLIN)
                 {
-                    LOGD << "epoll get in event" << ENDL;
+#define MAX_RD_SIZE (8 * 1024)
                     int olen = 0;
-                    static uint8_t recvBuff[1024 * 8]; // RIL message has max size of 8K
-                    if (args->recvAsync(recvBuff, sizeof(recvBuff), &olen))
-                        args->processResponse(recvBuff, olen);
+                    static uint8_t recvBuff[MAX_RD_SIZE]; // RIL message has max size of 8K
+                    int length = 0;
+
+                    // read message length
+                    if (args->recvAsync(&length, 4, &olen))
+                    {
+                        length = be32toh(length);
+                        LOGD << "response length = " << length << ENDL;
+                        if (length > MAX_RD_SIZE)
+                        {
+                            LOGE << "error, message lenth too long" << ENDL;
+                            length = MAX_RD_SIZE - 1;
+                        }
+                        // read message body
+                        if (args->recvAsync(recvBuff, length, &olen))
+                            args->processResponse(recvBuff, olen);
+                        else
+                            LOGE << "read response data failed" << ENDL;
+                    }
                     else
                         LOGE << "read response data failed" << ENDL;
                 }
@@ -97,9 +123,165 @@ bool DeviceManager::isReady()
     return mReady;
 }
 
+int open_usbfs(const char *d)
+{
+    int fd = open(d, O_RDWR);
+    if (fd < 0)
+    {
+        LOGE << "fail to open usbfs " << d << ENDL;
+        return fd;
+    }
+
+    int ifc = 6;
+    if (ioctl(fd, USBDEVFS_CLAIMINTERFACE, &ifc))
+    {
+        LOGE << "usbfs fail to claim interface: " << ifc << ENDL;
+        close(fd);
+        return 0;
+    }
+    handle.desc = fd;
+    handle.ep_in = 0x87;
+    handle.ep_out = 0x06;
+    handle.ep_in_maxpkt = 1024;
+    handle.ep_out_maxpkt = 1024;
+    strcpy(handle.fname, d);
+
+    return fd;
+}
+
+int usb_close(usb_handle *h)
+{
+    int fd;
+    int ifc = 6;
+
+    fd = handle.desc;
+    handle.desc = -1;
+    if (fd >= 0)
+    {
+        ioctl(fd, USBDEVFS_RELEASEINTERFACE, &ifc);
+        close(fd);
+        fd = -1;
+    }
+
+    return 0;
+}
+
+#define MAX_USBFS_BULK_SIZE (16 * 1024)
+int usb_write(const void *_data, int len)
+{
+    unsigned char *data = (unsigned char *)_data;
+    unsigned count = 0;
+    struct usbdevfs_bulktransfer bulk;
+    int n;
+
+    if (handle.ep_out == 0 || handle.desc == -1)
+    {
+        return -1;
+    }
+
+    do
+    {
+        int xfer;
+        xfer = (len > MAX_USBFS_BULK_SIZE) ? MAX_USBFS_BULK_SIZE : len;
+
+        bulk.ep = handle.ep_out;
+        bulk.len = xfer;
+        bulk.data = data;
+        bulk.timeout = 0;
+
+        n = ioctl(handle.desc, USBDEVFS_BULK, &bulk);
+        if (n != xfer)
+        {
+            LOGFE("ERROR: n = %d, xfer = %d, errno = %d (%s)\n", n, xfer, errno, strerror(errno));
+            return -1;
+        }
+
+        count += xfer;
+        len -= xfer;
+        data += xfer;
+    } while (len > 0);
+
+    return count;
+}
+
+#define MAX_RETRIES 5
+int usb_read(void *_data, int len)
+{
+    unsigned char *data = (unsigned char *)_data;
+    unsigned count = 0;
+    struct usbdevfs_bulktransfer bulk;
+    int n, retry;
+
+    if (handle.ep_in == 0 || handle.desc == -1)
+    {
+        return -1;
+    }
+
+    while (len > 0)
+    {
+        int xfer = (len > MAX_USBFS_BULK_SIZE) ? MAX_USBFS_BULK_SIZE : len;
+
+        bulk.ep = handle.ep_in;
+        bulk.len = xfer;
+        bulk.data = data;
+        bulk.timeout = 0;
+        retry = 0;
+
+        do
+        {
+            LOGFI("[ usb read %d fd = %d], fname=%s\n", xfer, handle.desc, handle.fname);
+            n = ioctl(handle.desc, USBDEVFS_BULK, &bulk);
+            LOGFI("[ usb read %d ] = %d, fname=%s, Retry %d \n", xfer, n, handle.fname, retry);
+
+            if (n < 0)
+            {
+                LOGFE("ERROR: n = %d, errno = %d (%s)\n", n, errno, strerror(errno));
+                if (++retry > MAX_RETRIES)
+                    return -1;
+                sleep(1);
+            }
+        } while (n < 0);
+
+        count += n;
+        len -= n;
+        data += n;
+
+        if (n < xfer)
+        {
+            break;
+        }
+    }
+
+    return count;
+}
+
 static int open_tty(const char *d)
 {
-    return open(d, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    int fd = open(d, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    struct termios tio;
+    struct termios settings;
+    int retval;
+    memset(&tio, 0, sizeof(tio));
+    tio.c_iflag = 0;
+    tio.c_oflag = 0;
+    tio.c_cflag = CS8 | CREAD | CLOCAL; // 8n1, see termios.h for more information
+    tio.c_lflag = 0;
+    tio.c_cc[VMIN] = 1;
+    tio.c_cc[VTIME] = 5;
+    cfsetospeed(&tio, B115200); // 115200 baud
+    cfsetispeed(&tio, B115200); // 115200 baud
+    tcsetattr(fd, TCSANOW, &tio);
+    retval = tcgetattr(fd, &settings);
+    if (-1 == retval)
+    {
+        LOGE << "setUart error" << ENDL;
+    }
+    cfmakeraw(&settings);
+    settings.c_cflag |= CREAD | CLOCAL;
+    tcflush(fd, TCIOFLUSH);
+    tcsetattr(fd, TCSANOW, &settings);
+
+    return fd;
 }
 
 static int open_unix_sock(const char *d)
@@ -128,10 +310,12 @@ static int open_unix_sock(const char *d)
 bool DeviceManager::openDevice()
 {
     int fd;
-    if (mDevice.find("socket") == std::string::npos)
-        fd = open_tty(mDevice.c_str());
-    else
+    if (mDevice.find("socket") != std::string::npos)
         fd = open_unix_sock(mDevice.c_str());
+    else if (mDevice.find("/dev/bus/usb") != std::string::npos)
+        fd = open_usbfs(mDevice.c_str());
+    else
+        fd = open_tty(mDevice.c_str());
 
     if (fd < 0)
     {
@@ -178,9 +362,12 @@ bool DeviceManager::sendAsync(const void *data, int len)
         return false;
 
     dump_msg(data, len, ">>>>>>");
-    ssize_t ret = write(mHandle, data, len);
+
+    // ssize_t ret = write(mHandle, data, len);
+    int ret = usb_write(data, len);
     if (ret < 0)
     {
+        LOGE << "send message failed" << ENDL;
         return false;
     }
     return true;
@@ -190,13 +377,18 @@ bool DeviceManager::recvAsync(void *data, int len, int *olen)
 {
     std::lock_guard<std::mutex> _lk(mRWLock);
 
-    *olen = 0;
+    if (olen)
+        *olen = 0;
     if (!mReady)
         return false;
 
-    ssize_t ret = read(mHandle, data, len);
+    // ssize_t ret = read(mHandle, data, len);
+    int ret = usb_read(data, len);
     if (ret < 0)
+    {
+        LOGE << "recv message failed" << ENDL;
         return false;
+    }
 
     dump_msg(data, ret, "<<<<<<");
     if (olen)
@@ -251,13 +443,8 @@ void DeviceManager::processResponse(void *data, size_t len)
     }
 
     p.setData(reinterpret_cast<uint8_t *>(data), len);
-    int type = p.readInt();
 
-    /**
-     * TODO
-     * unknow here, what's the meaning of the first 4 byte
-     */
-    // type = p.readInt();
+    int type = p.readInt();
 
     // process unsolicited myself */
     if (type == RESPONSE_UNSOLICITED)

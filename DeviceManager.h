@@ -47,4 +47,14 @@ private:
     void processResponse(void *data, size_t len);
 };
 
+typedef struct
+{
+    char fname[64];
+    int desc;
+    unsigned char ep_in;
+    unsigned char ep_out;
+    unsigned short ep_in_maxpkt;
+    unsigned short ep_out_maxpkt;
+} usb_handle;
+
 #endif //__DEVICEMANAGER
