@@ -16,7 +16,6 @@ private:
     std::mutex mListLock;
     std::string mDevice;
     std::future<int> mFuture;
-    std::thread::id mPollID;
     bool mQuitFlag;
     bool mReady;
     int mHandle;

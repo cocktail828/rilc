@@ -32,6 +32,8 @@ void RilResponse::responseString(Parcel &p)
     const char *response = p.readString();
     mRespString = response;
     p.freeString(response);
+
+    LOGD << "UNMARSHAL: " << mRespString << ENDL;
 }
 
 void RilResponse::responseInts(Parcel &p)

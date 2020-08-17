@@ -63,6 +63,8 @@ public:
     {
         std::lock_guard<std::mutex> _lk(mListLock);
         /* notice all the ovservers the quit event */
+
+        LOGD << "removing all observers" << ENDL;
         for (auto o : mObservers)
         {
             Parcel p;
@@ -71,6 +73,7 @@ public:
         }
 
         mObservers.clear();
+        LOGD << "removing all observers finished" << ENDL;
     }
 };
 

@@ -23,9 +23,9 @@ void poolRead(DeviceManager *args)
     event.events = EPOLLIN | EPOLLRDHUP;
     epoll_ctl(epfd, EPOLL_CTL_ADD, args->mHandle, &event);
 
-    args->mPollID = std::this_thread::get_id();
+    std::thread::id mPollID = std::this_thread::get_id();
 
-    LOGI << "polling thread start polling, thread id " << args->mPollID << ENDL;
+    LOGI << "polling thread start polling, thread id " << mPollID << ENDL;
     epoll_event events[10];
     do
     {
@@ -46,13 +46,13 @@ void poolRead(DeviceManager *args)
                 if (events[i].events & EPOLLRDHUP)
                 {
                     LOGE << "peer close device" << ENDL;
-                    break;
+                    goto quit_polling;
                 }
 
                 if (events[i].events & (EPOLLERR | EPOLLHUP))
                 {
                     LOGE << "epoll error, event = " << events[i].events << ENDL;
-                    break;
+                    goto quit_polling;
                 }
 
                 if (events[i].events & EPOLLIN)
@@ -60,25 +60,29 @@ void poolRead(DeviceManager *args)
                     LOGD << "epoll get in event" << ENDL;
                     int olen = 0;
                     static uint8_t recvBuff[1024 * 8]; // RIL message has max size of 8K
-                    size_t len = args->recvAsync(recvBuff, sizeof(recvBuff), &olen);
-                    args->processResponse(recvBuff, len);
+                    if (args->recvAsync(recvBuff, sizeof(recvBuff), &olen))
+                        args->processResponse(recvBuff, olen);
+                    else
+                        LOGE << "read response data failed" << ENDL;
                 }
             }
         }
     } while (1);
+
+quit_polling:
     LOGW << "polling thread quit polling" << ENDL;
     args->mReady = false;
 }
 
 DeviceManager::DeviceManager(const char *d)
-    : mDevice(d), mPollID(0), mQuitFlag(false),
+    : mDevice(d), mQuitFlag(false),
       mReady(false), mHandle(0)
 {
 }
 
 DeviceManager::~DeviceManager()
 {
-    close(mHandle);
+    mHandle = 0;
     mReady = false;
 }
 
@@ -100,17 +104,19 @@ static int open_tty(const char *d)
 
 static int open_unix_sock(const char *d)
 {
-    int sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    int sockfd = socket(AF_LOCAL, SOCK_STREAM, 0);
     if (sockfd < 0)
         return -1;
 
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(sockaddr));
-    addr.sun_family = AF_UNIX;
+    addr.sun_family = AF_LOCAL;
 
     /* do not generate socket file */
-    memcpy(addr.sun_path + 1, d, strlen(d));
-    socklen_t slen = offsetof(sockaddr_un, sun_path) + strlen(d) + 1;
+    // memcpy(addr.sun_path + 1, d, strlen(d));
+    // socklen_t slen = offsetof(sockaddr_un, sun_path) + strlen(d) + 1;
+    memcpy(addr.sun_path, d, strlen(d));
+    socklen_t slen = offsetof(sockaddr_un, sun_path) + strlen(d);
     if (connect(sockfd, (struct sockaddr *)&addr, slen) < 0)
         return -1;
 
@@ -122,7 +128,7 @@ static int open_unix_sock(const char *d)
 bool DeviceManager::openDevice()
 {
     int fd;
-    if (mDevice.find("/dev") != std::string::npos)
+    if (mDevice.find("socket") == std::string::npos)
         fd = open_tty(mDevice.c_str());
     else
         fd = open_unix_sock(mDevice.c_str());
@@ -132,6 +138,7 @@ bool DeviceManager::openDevice()
         LOGE << "open " << mDevice << " failed" << ENDL;
         return false;
     }
+    LOGI << "open " << mDevice << " successfully, fd = " << fd << ENDL;
 
     mHandle = fd;
     startPooling();
@@ -140,15 +147,18 @@ bool DeviceManager::openDevice()
 
 bool DeviceManager::closeDevice()
 {
+    LOGD << "closeDevice fd = " << mHandle << ENDL;
     /* close file descriper first, so polling thread will quit */
     close(mHandle);
+    mHandle = 0;
 
+    LOGD << "closeDevice successfully" << ENDL;
     detachAll();
     stopPooling();
     return true;
 }
 
-static void dump_msg(const void *data, int len)
+static void dump_msg(const void *data, int len, const char *direction)
 {
     static char _msg[16 * 1024];
     memset(_msg, 0, sizeof(_msg));
@@ -157,7 +167,7 @@ static void dump_msg(const void *data, int len)
     for (int i = 0; i < len; i++)
         snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
 
-    LOGD << "dump_msg: " << _msg << ENDL;
+    LOGD << "(" + std::to_string(len) + "): " + direction + " " << _msg << ENDL;
 }
 
 bool DeviceManager::sendAsync(const void *data, int len)
@@ -167,7 +177,7 @@ bool DeviceManager::sendAsync(const void *data, int len)
     if (!mReady)
         return false;
 
-    dump_msg(data, len);
+    dump_msg(data, len, ">>>>>>");
     ssize_t ret = write(mHandle, data, len);
     if (ret < 0)
     {
@@ -180,6 +190,7 @@ bool DeviceManager::recvAsync(void *data, int len, int *olen)
 {
     std::lock_guard<std::mutex> _lk(mRWLock);
 
+    *olen = 0;
     if (!mReady)
         return false;
 
@@ -187,7 +198,7 @@ bool DeviceManager::recvAsync(void *data, int len, int *olen)
     if (ret < 0)
         return false;
 
-    dump_msg(data, *olen);
+    dump_msg(data, ret, "<<<<<<");
     if (olen)
         *olen = ret;
     return true;
@@ -223,6 +234,7 @@ int DeviceManager::stopPooling()
             LOGI << "polling thread exit with code " << ret << ENDL;
             break;
         }
+        LOGI << "stopPooling try time = " << wait << ENDL;
         wait++;
     }
     return true;
@@ -232,16 +244,30 @@ void DeviceManager::processResponse(void *data, size_t len)
 {
     Parcel p;
 
+    if (len == 0)
+    {
+        LOGD << "response should not has length of zero" << ENDL;
+        return;
+    }
+
     p.setData(reinterpret_cast<uint8_t *>(data), len);
     int type = p.readInt();
+
+    /**
+     * TODO
+     * unknow here, what's the meaning of the first 4 byte
+     */
+    // type = p.readInt();
 
     // process unsolicited myself */
     if (type == RESPONSE_UNSOLICITED)
     {
+        LOGD << "process unsocilited message" << ENDL;
         RILREQUEST::processUnsolicited(p);
     }
     else if (type == RESPONSE_SOLICITED)
     {
+        LOGD << "process socilited message" << ENDL;
         /* find the observer and notice him */
         int requestid = p.readInt();
         for (auto o : mObservers)
@@ -252,5 +278,10 @@ void DeviceManager::processResponse(void *data, size_t len)
                 detach(o);
             }
         }
+    }
+    else
+    {
+        LOGE << "oops, unknow the message type!!! type = " << type << ENDL;
+        LOGE << "Malformation message!!!" << ENDL;
     }
 }

@@ -7,6 +7,10 @@
 #include "DeviceManager.h"
 #include "parcel/parcel.h"
 
+#ifndef __attribute_deprecated__
+#define __attribute_deprecated__ __attribute__((deprecated))
+#endif
+
 #define RIL_MAX_BUFSIZE (1024 * 8)
 class RilRequest final : public IObserver
 {
@@ -25,13 +29,14 @@ public:
 private:
     /* instance variables */
     std::mutex mRequestLock;
-    std::condition_variable mRequestcond;
+    std::condition_variable mRequestCond;
 
     /* transication id, increasing */
     int mRequestId;
 
     /* command id of the specified request */
     int mCommandId;
+
     Parcel mParcel;
 
 public:
@@ -45,7 +50,7 @@ public:
 
     static void resetRequest();
 
-    static bool send(RilRequest *);
+    static bool blockSend(RilRequest *);
 
 public:
     explicit RilRequest();

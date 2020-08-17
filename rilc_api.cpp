@@ -48,17 +48,20 @@ int RILC_uninit()
         return EBUSY;
 
     if (!RILREQUEST::isReady())
+    {
+        RILREQUEST::mGlobalLock.unlock();
         return 0;
+    }
 
     int ret = RILREQUEST::uninit();
     RILREQUEST::mGlobalLock.unlock();
     return ret;
 }
 
-int RILC_requestIMSI()
+int RILC_requestIMEI()
 {
     RilRequest req;
-    req.getIMSI();
+    req.getIMEI();
 
     return 0;
 }

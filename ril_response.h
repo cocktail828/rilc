@@ -44,12 +44,15 @@ public:
             delete mRawdata;
     }
 
+public:
+    static std::string responseToString(int respid);
+
+public:
     void setResponseID(int id);
 
     void setResponseURCInfo(bool isurc);
 
     /* common use functions */
-    std::string responseToString(int respid);
 
     void responseVoid(Parcel &p);
 
