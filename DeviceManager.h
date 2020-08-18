@@ -37,9 +37,9 @@ public:
 
     int recvAsync(void *data, int len, int *olen);
 
-    int startPooling();
+    int startPolling();
 
-    int stopPooling();
+    int stopPolling();
 
     friend void pollingRead(DeviceManager *args);
 

@@ -91,6 +91,8 @@ void pollingRead(DeviceManager *args)
     } while (1);
 
 quit_polling:
+    epoll_ctl(epfd, EPOLL_CTL_DEL, args->mPollingHandle, &event);
+    close(epfd);
     LOGW << "polling thread quit polling" << ENDL;
     args->mReady = false;
 }
@@ -191,7 +193,7 @@ bool DeviceManager::openDevice()
     LOGI << "open " << mDevice << " successfully, fd = " << fd << ENDL;
 
     mPollingHandle = fd;
-    startPooling();
+    startPolling();
     return true;
 }
 
@@ -205,7 +207,7 @@ bool DeviceManager::closeDevice()
 
     LOGD << "closeDevice successfully" << ENDL;
     detachAll();
-    stopPooling();
+    stopPolling();
     return true;
 }
 
@@ -261,7 +263,7 @@ int DeviceManager::recvAsync(void *data, int len, int *olen)
     return true;
 }
 
-int DeviceManager::startPooling()
+int DeviceManager::startPolling()
 {
     mPollingFuture = std::async(std::launch::async, [&] {
         pollingRead(this);
@@ -271,7 +273,7 @@ int DeviceManager::startPooling()
     return true;
 }
 
-int DeviceManager::stopPooling()
+int DeviceManager::stopPolling()
 {
     const int max_wait = 10;
     int wait = 0;

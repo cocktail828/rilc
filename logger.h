@@ -113,6 +113,12 @@ public:
 
     Logger &operator<<(std::ostream &(*os)(std::ostream &))
     {
+        dump_line();
+        return *this;
+    }
+
+    void dump_line()
+    {
         std::lock_guard<std::mutex> _lk(m_lk);
         time_t rawtime;
         char now[80];
@@ -143,7 +149,7 @@ public:
 
             /* stdout/stderr */
             if (m_sync_stdout)
-                std::cerr << obuf << os;
+                std::cerr << obuf << std::endl;
 
             if (m_sync_file)
             {
@@ -157,22 +163,20 @@ public:
         m_funcname = "";
         m_filename = "";
         m_line = 0;
-        return *this;
     }
 
     template <typename T>
-    Logger &operator()(T t)
+    void operator()(T t)
     {
-        *this << t << std::endl;
-        return *this;
+        ss << t;
+        dump_line();
     }
 
     template <typename T, typename... Args>
-    Logger &operator()(T t, Args... args)
+    void operator()(const T &t, const Args &... args)
     {
-        *this << t;
-        Logger()(args...);
-        return *this;
+        ss << t;
+        (*this)(args...);
     }
 };
 
