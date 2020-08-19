@@ -1,6 +1,17 @@
 #include "parcel.h"
 #include "jstring.h"
 
+#define SIZE_T_MAX (0xffffffff)
+
+static size_t pad_size(size_t s)
+{
+    if (s > (SIZE_T_MAX - 3))
+    {
+        abort();
+    }
+    return PAD_SIZE_UNSAFE(s);
+}
+
 Parcel::Parcel()
 {
     mData = NULL;
@@ -155,7 +166,7 @@ status_t Parcel::continueWrite(size_t desired)
     return NO_ERROR;
 }
 
-status_t Parcel::readInt(int32_t *pArg) const
+status_t Parcel::readInt32(int32_t *pArg) const
 {
     return readAligned(pArg);
 }
@@ -173,7 +184,7 @@ status_t Parcel::readAligned(T *pArg) const
     return NOT_ENOUGH_DATA;
 }
 
-status_t Parcel::writeInt(int32_t val)
+status_t Parcel::writeInt32(int32_t val)
 {
     return writeAligned(val);
 }
@@ -216,7 +227,7 @@ void Parcel::freeString(const char *str) const
 
 const char *Parcel::readString() const
 {
-    int32_t size = readInt();
+    int32_t size = readInt32();
     if (size >= 0 && size < INT32_MAX)
     {
         const char16_t *str16 = (const char16_t *)readInplace((size + 1) * sizeof(char16_t));
@@ -229,16 +240,26 @@ const char *Parcel::readString() const
 
 const void *Parcel::readInplace(size_t len) const
 {
-    if ((mDataPos + PAD_SIZE(len)) >= mDataPos && (mDataPos + PAD_SIZE(len)) <= mDataSize && len <= PAD_SIZE(len))
+    if (len > INT32_MAX)
+    {
+        // don't accept size_t values which may have come from an
+        // inadvertent conversion from a negative int.
+        return NULL;
+    }
+
+    if ((mDataPos + pad_size(len)) >= mDataPos &&
+        (mDataPos + pad_size(len)) <= mDataSize &&
+        len <= pad_size(len))
     {
         const void *data = mData + mDataPos;
-        mDataPos += PAD_SIZE(len);
+        mDataPos += pad_size(len);
+        // ALOGV("readInplace Setting data pos of %p to %zu", this, mDataPos);
         return data;
     }
     return NULL;
 }
 
-int32_t Parcel::readInt() const
+int32_t Parcel::readInt32() const
 {
     return readAligned<int32_t>();
 }
@@ -259,10 +280,10 @@ status_t Parcel::writeString(const char *str)
     size_t s16_len;
     char16_t *str16 = strdup8to16(str, &s16_len);
 
-    if (str16 == NULL || strlen(str) == 0)
-        return writeInt(-1);
+    if (str16 == NULL)
+        return writeInt32(-1);
 
-    status_t err = writeInt(s16_len);
+    status_t err = writeInt32(s16_len);
     if (err == NO_ERROR)
     {
         s16_len *= sizeof(char16_t);
@@ -279,36 +300,9 @@ status_t Parcel::writeString(const char *str)
     return err;
 }
 
-// template <typename... args>
-// status_t Parcel::writeString()
-// {
-//     size_t s16_len;
-//     char16_t *str16 = strdup8to16(str, &s16_len);
-
-//     if (str16 == NULL)
-//         return writeInt(-1);
-
-//     status_t err = writeInt(s16_len);
-//     if (err == NO_ERROR)
-//     {
-//         s16_len *= sizeof(char16_t);
-//         uint8_t *data = (uint8_t *)writeInplace(s16_len + sizeof(char16_t));
-//         if (data)
-//         {
-//             memcpy(data, str16, s16_len);
-//             *reinterpret_cast<char16_t *>(data + s16_len) = 0;
-//             free(str16);
-//             return NO_ERROR;
-//         }
-//     }
-//     free(str16);
-//     return err;
-// }
-
 void *Parcel::writeInplace(size_t len)
 {
-
-    const size_t padded = PAD_SIZE(len);
+    const size_t padded = pad_size(len);
 
     // sanity check for integer overflow
     if (mDataPos + padded < mDataPos)

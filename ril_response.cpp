@@ -6,22 +6,30 @@
 void responseStrings(Parcel &p)
 {
     int num;
-    num = p.readInt();
-    for (int i = 0; i < num; i++)
-    {
-        auto str = p.readString();
-        // resp.mRespVecString.emplace_back(str);
-        p.freeString(str);
-    }
+    std::vector<std::string> response;
+
+    num = p.readInt32();
+    // for (int i = 0; i < num; i++)
+    // {
+    //     auto str = p.readString();
+    //     response.emplace_back(str == NULL ? "" : str);
+    //     p.freeString(str);
+    // }
+
+    LOGI << "UNMARSHAL: num of string " << num << ENDL;
+    LOGI << "UNMARSHAL: ";
+    for (auto i : response)
+        LOGI << i << " ";
+    LOGI << ENDL;
 }
 
 void responseString(Parcel &p)
 {
-    const char *response = p.readString();
-    std::string mRespString = response;
-    p.freeString(response);
+    // const char *response = p.readString();
+    // std::string mRespString = response;
+    // p.freeString(response);
 
-    LOGI << "UNMARSHAL: " << mRespString << ENDL;
+    // LOGI << "UNMARSHAL: " << mRespString << ENDL;
 }
 
 void responseInts(Parcel &p)
@@ -29,23 +37,23 @@ void responseInts(Parcel &p)
     int numInts;
     std::vector<int> response;
 
-    numInts = p.readInt();
+    numInts = p.readInt32();
 
-    LOGI << "UNMARSHAL: ";
     for (int i = 0; i < numInts; i++)
     {
-        int data = p.readInt();
+        int data = p.readInt32();
         response.emplace_back(data);
-        LOGI << data << " ";
     }
+
+    LOGI << "UNMARSHAL: ";
+    for (auto i : response)
+        LOGI << i << " ";
     LOGI << ENDL;
 }
 
 void responseVoid(Parcel &p)
 {
 }
-
-/***** Private Methods ******/
 
 // private
 // void sendScreenState(boolean on)
@@ -212,7 +220,7 @@ void responseCallForward(Parcel &p)
     //     int numInfos;
     //     CallForwardInfo infos[];
 
-    //     numInfos = p.readInt();
+    //     numInfos = p.readInt32();
 
     //     infos = new CallForwardInfo[numInfos];
 
@@ -220,12 +228,12 @@ void responseCallForward(Parcel &p)
     //     {
     //         infos[i] = new CallForwardInfo();
 
-    //         infos[i].status = p.readInt();
-    //         infos[i].reason = p.readInt();
-    //         infos[i].serviceClass = p.readInt();
-    //         infos[i].toa = p.readInt();
+    //         infos[i].status = p.readInt32();
+    //         infos[i].reason = p.readInt32();
+    //         infos[i].serviceClass = p.readInt32();
+    //         infos[i].toa = p.readInt32();
     //         infos[i].number = p.readString();
-    //         infos[i].timeSeconds = p.readInt();
+    //         infos[i].timeSeconds = p.readInt32();
     //     }
 }
 
@@ -233,10 +241,10 @@ void responseSuppServiceNotification(Parcel &p)
 {
     //     SuppServiceNotification notification = new SuppServiceNotification();
 
-    //     notification.notificationType = p.readInt();
-    //     notification.code = p.readInt();
-    //     notification.index = p.readInt();
-    //     notification.type = p.readInt();
+    //     notification.notificationType = p.readInt32();
+    //     notification.code = p.readInt32();
+    //     notification.index = p.readInt32();
+    //     notification.type = p.readInt32();
     //     notification.number = p.readString();
 }
 
@@ -261,9 +269,9 @@ void responseSMS(Parcel &p)
     int messageRef, errorCode;
     std::string ackPDU;
 
-    messageRef = p.readInt();
-    ackPDU = p.readString();
-    errorCode = p.readInt();
+    messageRef = p.readInt32();
+    // ackPDU = p.readString();
+    errorCode = p.readInt32();
 
     // SmsResponse response = new SmsResponse(messageRef, ackPDU, errorCode);
 }
@@ -274,8 +282,8 @@ void responseICC_IO(Parcel &p)
     //     byte data[] = null;
     //     ret;
 
-    //     sw1 = p.readInt();
-    //     sw2 = p.readInt();
+    //     sw1 = p.readInt32();
+    //     sw2 = p.readInt32();
 
     //     String s = p.readString();
 
@@ -287,36 +295,20 @@ void responseICC_IO(Parcel &p)
 
 void responseIccCardStatus(Parcel &p)
 {
-    //     IccCardApplication ca;
+    RIL_CardStatus_v6 ca;
 
-    //     IccCardStatus status = new IccCardStatus();
-    //     status.setCardState(p.readInt());
-    //     status.setUniversalPinState(p.readInt());
-    //     status.setGsmUmtsSubscriptionAppIndex(p.readInt());
-    //     status.setCdmaSubscriptionAppIndex(p.readInt());
-    //     status.setImsSubscriptionAppIndex(p.readInt());
-    //     int numApplications = p.readInt();
+    ca.card_state = static_cast<RIL_CardState>(p.readInt32());
+    ca.universal_pin_state = static_cast<RIL_PinState>(p.readInt32());
+    ca.gsm_umts_subscription_app_index = p.readInt32();
+    ca.cdma_subscription_app_index = p.readInt32();
+    ca.ims_subscription_app_index = p.readInt32();
+    ca.num_applications = p.readInt32();
 
-    //     // limit to maximum allowed applications
-    //     if (numApplications > IccCardStatus.CARD_MAX_APPS)
-    //     {
-    //         numApplications = IccCardStatus.CARD_MAX_APPS;
-    //     }
-    //     status.setNumApplications(numApplications);
-
-    //     for (int i = 0; i < numApplications; i++)
-    //     {
-    //         ca = new IccCardApplication();
-    //         ca.app_type = ca.AppTypeFromRILInt(p.readInt());
-    //         ca.app_state = ca.AppStateFromRILInt(p.readInt());
-    //         ca.perso_substate = ca.PersoSubstateFromRILInt(p.readInt());
-    //         ca.aid = p.readString();
-    //         ca.app_label = p.readString();
-    //         ca.pin1_replaced = p.readInt();
-    //         ca.pin1 = ca.PinStateFromRILInt(p.readInt());
-    //         ca.pin2 = ca.PinStateFromRILInt(p.readInt());
-    //         status.addApplication(ca);
-    //     }
+    // TODO parser application
+    // for (int i = 0; i < ca.num_applications; i++)
+    // {
+    //     ca.applications[i] =
+    // }
 }
 
 void responseCallList(Parcel &p)
@@ -326,33 +318,33 @@ void responseCallList(Parcel &p)
     //     ArrayList<DriverCall> response;
     //     DriverCall dc;
 
-    //     num = p.readInt();
+    //     num = p.readInt32();
     //     response = new ArrayList<DriverCall>(num);
 
     //     for (int i = 0; i < num; i++)
     //     {
     //         dc = new DriverCall();
 
-    //         dc.state = DriverCall.stateFromCLCC(p.readInt());
-    //         dc.index = p.readInt();
-    //         dc.TOA = p.readInt();
-    //         dc.isMpty = (0 != p.readInt());
-    //         dc.isMT = (0 != p.readInt());
-    //         dc.als = p.readInt();
-    //         voiceSettings = p.readInt();
+    //         dc.state = DriverCall.stateFromCLCC(p.readInt32());
+    //         dc.index = p.readInt32();
+    //         dc.TOA = p.readInt32();
+    //         dc.isMpty = (0 != p.readInt32());
+    //         dc.isMT = (0 != p.readInt32());
+    //         dc.als = p.readInt32();
+    //         voiceSettings = p.readInt32();
     //         dc.isVoice = (0 == voiceSettings) ? false : true;
-    //         dc.isVoicePrivacy = (0 != p.readInt());
+    //         dc.isVoicePrivacy = (0 != p.readInt32());
     //         dc.number = p.readString();
-    //         int np = p.readInt();
+    //         int np = p.readInt32();
     //         dc.numberPresentation = DriverCall.presentationFromCLIP(np);
     //         dc.name = p.readString();
-    //         dc.namePresentation = p.readInt();
-    //         int uusInfoPresent = p.readInt();
+    //         dc.namePresentation = p.readInt32();
+    //         int uusInfoPresent = p.readInt32();
     //         if (uusInfoPresent == 1)
     //         {
     //             dc.uusInfo = new UUSInfo();
-    //             dc.uusInfo.setType(p.readInt());
-    //             dc.uusInfo.setDcs(p.readInt());
+    //             dc.uusInfo.setType(p.readInt32());
+    //             dc.uusInfo.setDcs(p.readInt32());
     //             byte[] userData = p.createByteArray();
     //             dc.uusInfo.setUserData(userData);
     //             riljLogv(String.format("Incoming UUS : type=%d, dcs=%d, length=%d",
@@ -394,8 +386,8 @@ void responseCallList(Parcel &p)
 //     dataCall.version = version;
 //     if (version < 5)
 //     {
-//         dataCall.cid = p.readInt();
-//         dataCall.active = p.readInt();
+//         dataCall.cid = p.readInt32();
+//         dataCall.active = p.readInt32();
 //         dataCall.type = p.readString();
 //         String addresses = p.readString();
 //         if (!TextUtils.isEmpty(addresses))
@@ -405,10 +397,10 @@ void responseCallList(Parcel &p)
 //     }
 //     else
 //     {
-//         dataCall.status = p.readInt();
-//         dataCall.suggestedRetryTime = p.readInt();
-//         dataCall.cid = p.readInt();
-//         dataCall.active = p.readInt();
+//         dataCall.status = p.readInt32();
+//         dataCall.suggestedRetryTime = p.readInt32();
+//         dataCall.cid = p.readInt32();
+//         dataCall.active = p.readInt32();
 //         dataCall.type = p.readString();
 //         dataCall.ifname = p.readString();
 //         if ((dataCall.status == DataConnection.FailCause.NONE.getErrorCode()) &&
@@ -439,8 +431,8 @@ void responseDataCallList(Parcel &p)
 {
     //     ArrayList<DataCallState> response;
 
-    //     int ver = p.readInt();
-    //     int num = p.readInt();
+    //     int ver = p.readInt32();
+    //     int num = p.readInt32();
     //     riljLog("responseDataCallList ver=" + ver + " num=" + num);
 
     //     response = new ArrayList<DataCallState>(num);
@@ -454,8 +446,8 @@ void responseDataCallList(Parcel &p)
 
 void responseSetupDataCall(Parcel &p)
 {
-    //     int ver = p.readInt();
-    //     int num = p.readInt();
+    //     int ver = p.readInt32();
+    //     int num = p.readInt32();
     //     if (RILJ_LOGV)
     //         riljLog("responseSetupDataCall ver=" + ver + " num=" + num);
 
@@ -540,7 +532,7 @@ void responseCellList(Parcel &p)
     //     ArrayList<NeighboringCellInfo> response;
     //     NeighboringCellInfo cell;
 
-    //     num = p.readInt();
+    //     num = p.readInt32();
     //     response = new ArrayList<NeighboringCellInfo>();
 
     //     // Determine the radio access type
@@ -581,7 +573,7 @@ void responseCellList(Parcel &p)
     //     {
     //         for (int i = 0; i < num; i++)
     //         {
-    //             rssi = p.readInt();
+    //             rssi = p.readInt32();
     //             location = p.readString();
     //             cell = new NeighboringCellInfo(rssi, location, radioType);
     //             response.add(cell);
@@ -609,16 +601,16 @@ void responseGmsBroadcastConfig(Parcel &p)
     //     ArrayList<SmsBroadcastConfigInfo> response;
     //     SmsBroadcastConfigInfo info;
 
-    //     num = p.readInt();
+    //     num = p.readInt32();
     //     response = new ArrayList<SmsBroadcastConfigInfo>(num);
 
     //     for (int i = 0; i < num; i++)
     //     {
-    //         int fromId = p.readInt();
-    //         int toId = p.readInt();
-    //         int fromScheme = p.readInt();
-    //         int toScheme = p.readInt();
-    //         boolean selected = (p.readInt() == 1);
+    //         int fromId = p.readInt32();
+    //         int toId = p.readInt32();
+    //         int fromScheme = p.readInt32();
+    //         int toScheme = p.readInt32();
+    //         boolean selected = (p.readInt32() == 1);
 
     //         info = new SmsBroadcastConfigInfo(fromId, toId, fromScheme,
     //                                           toScheme, selected);
@@ -631,7 +623,7 @@ void responseCdmaBroadcastConfig(Parcel &p)
     //     int numServiceCategories;
     //     int response[];
 
-    //     numServiceCategories = p.readInt();
+    //     numServiceCategories = p.readInt32();
 
     //     if (numServiceCategories == 0)
     //     {
@@ -663,7 +655,7 @@ void responseCdmaBroadcastConfig(Parcel &p)
     //         response[0] = numServiceCategories;
     //         for (int i = 1; i < numInts; i++)
     //         {
-    //             response[i] = p.readInt();
+    //             response[i] = p.readInt32();
     //         }
     //     }
 }
@@ -676,7 +668,7 @@ void responseSignalStrength(Parcel &p)
     // /* TODO: Add SignalStrength class to match RIL_SignalStrength */
     // for (int i = 0; i < numInts; i++)
     // {
-    //     mRespVecInt.emplace_back(p.readInt());
+    //     mRespVecInt.emplace_back(p.readInt32());
     //     LOGI << mRespVecInt[i] << ENDL;
     // }
 }
@@ -690,7 +682,7 @@ void responseCdmaInformationRecord(Parcel &p)
     //          * Loop through all of the information records unmarshalling them
     //          * and converting them to Java Objects.
     //          */
-    //     numberOfInfoRecs = p.readInt();
+    //     numberOfInfoRecs = p.readInt32();
     //     response = new ArrayList<CdmaInformationRecords>(numberOfInfoRecs);
 
     //     for (int i = 0; i < numberOfInfoRecs; i++)
@@ -705,25 +697,25 @@ void responseCdmaCallWaiting(Parcel &p)
     //     CdmaCallWaitingNotification notification = new CdmaCallWaitingNotification();
 
     //     notification.number = p.readString();
-    //     notification.numberPresentation = notification.presentationFromCLIP(p.readInt());
+    //     notification.numberPresentation = notification.presentationFromCLIP(p.readInt32());
     //     notification.name = p.readString();
     //     notification.namePresentation = notification.numberPresentation;
-    //     notification.isPresent = p.readInt();
-    //     notification.signalType = p.readInt();
-    //     notification.alertPitch = p.readInt();
-    //     notification.signal = p.readInt();
-    //     notification.numberType = p.readInt();
-    //     notification.numberPlan = p.readInt();
+    //     notification.isPresent = p.readInt32();
+    //     notification.signalType = p.readInt32();
+    //     notification.alertPitch = p.readInt32();
+    //     notification.signal = p.readInt32();
+    //     notification.numberType = p.readInt32();
+    //     notification.numberPlan = p.readInt32();
 }
 
 void responseCallRing(Parcel &p)
 {
     //     char response[] = new char[4];
 
-    //     response[0] = (char)p.readInt(); // isPresent
-    //     response[1] = (char)p.readInt(); // signalType
-    //     response[2] = (char)p.readInt(); // alertPitch
-    //     response[3] = (char)p.readInt(); // signal
+    //     response[0] = (char)p.readInt32(); // isPresent
+    //     response[1] = (char)p.readInt32(); // signalType
+    //     response[2] = (char)p.readInt32(); // alertPitch
+    //     response[3] = (char)p.readInt32(); // signal
 }
 
 // private

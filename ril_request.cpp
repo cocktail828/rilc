@@ -1,11 +1,54 @@
-#include <assert.h>
 #include <vector>
+
+#include <assert.h>
+#include <endian.h>
 
 #include "ril_request.h"
 #include "ril_response.h"
 #include "logger.h"
 #include "ril/ril.h"
 
+/**
+ * RIL Response
+ */
+
+RILResponse::RILResponse() : mError(0), mCommandId(0), mIsUrc(false) {}
+
+RILResponse::~RILResponse() {}
+
+void RILResponse::setURC(bool is_urc)
+{
+    mIsUrc = is_urc;
+}
+
+bool RILResponse::isURC()
+{
+    return mIsUrc;
+}
+
+void RILResponse::setCommandId(int cid)
+{
+    mCommandId = cid;
+}
+
+int RILResponse::getCommandId()
+{
+    return mCommandId;
+}
+
+void RILResponse::setError(int err)
+{
+    mError = err;
+}
+
+int RILResponse::getError()
+{
+    return mError;
+}
+
+/**
+ * RIL Request
+ */
 DeviceManager *RILRequest::mDeviceMgr = nullptr;
 int RILRequest::mGlobalRequestId = 0;
 ;
@@ -497,13 +540,13 @@ void RILRequest::obtain(int cid)
     mCommandId = cid;
 
     /* marshal command id */
-    mParcel.writeInt(cid);
+    mParcel.writeInt32(cid);
 
     /* marshal request id */
-    mParcel.writeInt(mRequestId);
+    mParcel.writeInt32(mRequestId);
 
     /* marshal phone id */
-    mParcel.writeInt(0);
+    mParcel.writeInt32(0);
 }
 
 /**
@@ -569,7 +612,7 @@ bool RILRequest::isReady()
     return mReady;
 }
 
-void RILRequest::resetRequest()
+void RILRequest::resetGlobalRequest()
 {
     std::lock_guard<std::mutex> _lk(mGlobalLock);
     mGlobalRequestId = 0;
@@ -636,7 +679,7 @@ bool RILRequest::nonblockSend(RILRequest *rr)
     return false;
 }
 
-RILRequest::RILRequest()
+RILRequest::RILRequest() : mCommandId(0), mRequestId(0)
 {
 }
 
@@ -681,6 +724,11 @@ int RILRequest::getCommandId()
 
 void RILRequest::recycle()
 {
+    mCommandId = 0;
+    mRequestId = 0;
+    mResponse.setCommandId(0);
+    mResponse.setError(0);
+    mResponse.setURC(0);
     mParcel.recycle();
 }
 
@@ -711,7 +759,7 @@ void RILRequest::supplyIccPinForApp(std::string pin, std::string aid)
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    mParcel.writeInt(2);
+    mParcel.writeInt32(2);
     mParcel.writeString(pin.c_str());
     mParcel.writeString(aid.c_str());
 
@@ -735,7 +783,7 @@ void RILRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::st
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    mParcel.writeInt(3);
+    mParcel.writeInt32(3);
     mParcel.writeString(puk.c_str());
     mParcel.writeString(newPin.c_str());
     mParcel.writeString(aid.c_str());
@@ -760,7 +808,7 @@ void RILRequest::supplyIccPin2ForApp(std::string pin, std::string aid)
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    mParcel.writeInt(2);
+    mParcel.writeInt32(2);
     mParcel.writeString(pin.c_str());
     mParcel.writeString(aid.c_str());
 
@@ -784,7 +832,7 @@ void RILRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    mParcel.writeInt(3);
+    mParcel.writeInt32(3);
     mParcel.writeString(puk.c_str());
     mParcel.writeString(newPin2.c_str());
     mParcel.writeString(aid.c_str());
@@ -809,7 +857,7 @@ void RILRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std:
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    mParcel.writeInt(3);
+    mParcel.writeInt32(3);
     mParcel.writeString(oldPin.c_str());
     mParcel.writeString(newPin.c_str());
     mParcel.writeString(aid.c_str());
@@ -834,7 +882,7 @@ void RILRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, s
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    mParcel.writeInt(3);
+    mParcel.writeInt32(3);
     mParcel.writeString(oldPin2.c_str());
     mParcel.writeString(newPin2.c_str());
     mParcel.writeString(aid.c_str());
@@ -852,7 +900,7 @@ void RILRequest::changeBarringPassword(std::string facility, std::string oldPwd,
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    mParcel.writeInt(3);
+    mParcel.writeInt32(3);
     mParcel.writeString(facility.c_str());
     mParcel.writeString(oldPwd.c_str());
     mParcel.writeString(newPwd.c_str());
@@ -870,7 +918,7 @@ void RILRequest::supplyNetworkDepersonalization(std::string netpin)
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    mParcel.writeInt(1);
+    mParcel.writeInt32(1);
     mParcel.writeString(netpin.c_str());
 
     if (!blockSend(this))
@@ -911,40 +959,48 @@ void RILRequest::getDataCallList()
     }
 }
 
-// void RILRequest::dial(std::string address, int clirMode)
-// {
-//     dial(address, clirMode, "");
-// }
+void RILRequest::dial(std::string address, int clirMode)
+{
+    dial(address, clirMode, nullptr);
+}
 
-// void RILRequest::dial(std::string address, int clirMode, UUSInfo *uusInfo)
-// {
-//     obtain(//              RIL_REQUEST_DIAL);
+void RILRequest::dial(std::string address, int clirMode, RIL_UUS_Info *uusInfo)
+{
+    obtain(RIL_REQUEST_DIAL);
 
-//     mParcel.writeString(address.c_str());
-//     mParcel.writeInt(clirMode);
-//     mParcel.writeInt(0); // UUS information is absent
+    mParcel.writeString(address.c_str());
+    mParcel.writeInt32(clirMode);
 
-//     if (uusInfo == nullptr)
-//     {
-//         mParcel.writeInt(0); // UUS information is absent
-//     }
-//     else
-//     {
-//         mParcel.writeInt(1); // UUS information is present
-//         mParcel.writeInt(uusInfo.getType());
-//         mParcel.writeInt(uusInfo.getDcs());
-//         mParcel.writeByteAthisay(uusInfo.getUserData());
-//     }
+    if (uusInfo == nullptr)
+    {
+        mParcel.writeInt32(0); // UUS information is absent
+    }
+    else
+    {
+        // mParcel.writeInt32(1); // UUS information is present
+        // mParcel.writeInt32(uusInfo.getType());
+        // mParcel.writeInt32(uusInfo.getDcs());
+        // mParcel.writeByteAarray(uusInfo.getUserData());
+    }
 
-//     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
-// }
+    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    if (!blockSend(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+}
 
+/**
+ * Be careful, insert SIM card, before call this function
+ * or the rild will dump
+ */
 void RILRequest::getIMSI()
 {
     obtain(RIL_REQUEST_GET_IMSI);
 
-    mParcel.writeInt(0);
+    // mParcel.writeInt32(0);
+    mParcel.writeString(NULL);
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     if (!blockSend(this))
@@ -988,8 +1044,8 @@ void RILRequest::hangupConnection(int gsmIndex)
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << gsmIndex << ENDL;
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(gsmIndex);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(gsmIndex);
 
     if (!blockSend(this))
     {
@@ -1054,8 +1110,8 @@ void RILRequest::setPreferredVoicePrivacy(bool enable)
 {
     obtain(RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE);
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(enable ? 1 : 0);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(enable ? 1 : 0);
 
     if (!blockSend(this))
     {
@@ -1080,8 +1136,8 @@ void RILRequest::separateConnection(int gsmIndex)
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << gsmIndex << ENDL;
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(gsmIndex);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(gsmIndex);
 
     if (!blockSend(this))
     {
@@ -1169,8 +1225,8 @@ void RILRequest::setMute(bool enableMute)
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << enableMute << ENDL;
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(enableMute ? 1 : 0);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(enableMute ? 1 : 0);
 
     if (!blockSend(this))
     {
@@ -1291,7 +1347,7 @@ void RILRequest::sendBurstDtmf(std::string dtmfString, int on, int off)
 {
     obtain(RIL_REQUEST_CDMA_BURST_DTMF);
 
-    mParcel.writeInt(3);
+    mParcel.writeInt32(3);
     mParcel.writeString(dtmfString.c_str());
     mParcel.writeString(std::to_string(on).c_str());
     mParcel.writeString(std::to_string(off).c_str());
@@ -1309,7 +1365,7 @@ void RILRequest::sendSMS(std::string smscPDU, std::string pdu)
 {
     obtain(RIL_REQUEST_SEND_SMS);
 
-    mParcel.writeInt(2);
+    mParcel.writeInt32(2);
     mParcel.writeString(smscPDU.c_str());
     mParcel.writeString(pdu.c_str());
 
@@ -1335,20 +1391,20 @@ void RILRequest::sendSMS(std::string smscPDU, std::string pdu)
 
 //     try
 //     {
-//         mParcel.writeInt(dis.readInt());        //teleServiceId
-//         mParcel.writeByte((byte)dis.readInt()); //servicePresent
-//         mParcel.writeInt(dis.readInt());        //serviceCategory
-//         mParcel.writeInt(dis.read());           //address_digit_mode
-//         mParcel.writeInt(dis.read());           //address_nbr_mode
-//         mParcel.writeInt(dis.read());           //address_ton
-//         mParcel.writeInt(dis.read());           //address_nbr_plan
+//         mParcel.writeInt32(dis.readInt32());        //teleServiceId
+//         mParcel.writeByte((byte)dis.readInt32()); //servicePresent
+//         mParcel.writeInt32(dis.readInt32());        //serviceCategory
+//         mParcel.writeInt32(dis.read());           //address_digit_mode
+//         mParcel.writeInt32(dis.read());           //address_nbr_mode
+//         mParcel.writeInt32(dis.read());           //address_ton
+//         mParcel.writeInt32(dis.read());           //address_nbr_plan
 //         address_nbr_of_digits = (byte)dis.read();
 //         mParcel.writeByte((byte)address_nbr_of_digits);
 //         for (int i = 0; i < address_nbr_of_digits; i++)
 //         {
 //             mParcel.writeByte(dis.readByte()); // address_orig_bytes[i]
 //         }
-//         mParcel.writeInt(dis.read());        //subaddressType
+//         mParcel.writeInt32(dis.read());        //subaddressType
 //         mParcel.writeByte((byte)dis.read()); //subaddr_odd
 //         subaddr_nbr_of_digits = (byte)dis.read();
 //         mParcel.writeByte((byte)subaddr_nbr_of_digits);
@@ -1358,7 +1414,7 @@ void RILRequest::sendSMS(std::string smscPDU, std::string pdu)
 //         }
 
 //         bearerDataLength = dis.read();
-//         mParcel.writeInt(bearerDataLength);
+//         mParcel.writeInt32(bearerDataLength);
 //         for (int i = 0; i < bearerDataLength; i++)
 //         {
 //             mParcel.writeByte(dis.readByte()); //bearerData[i]
@@ -1379,8 +1435,8 @@ void RILRequest::deleteSmsOnSim(int index)
 {
     obtain(RIL_REQUEST_DELETE_SMS_ON_SIM);
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(index);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(index);
 
     if (false)
         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << index << ENDL;
@@ -1396,8 +1452,8 @@ void RILRequest::deleteSmsOnRuim(int index)
 {
     obtain(RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM);
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(index);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(index);
 
     if (false)
         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << index << ENDL;
@@ -1447,7 +1503,7 @@ void RILRequest::writeSmsToSim(int status, std::string smsc, std::string pdu)
 
     obtain(RIL_REQUEST_WRITE_SMS_TO_SIM);
 
-    mParcel.writeInt(status);
+    mParcel.writeInt32(status);
     mParcel.writeString(pdu.c_str());
     mParcel.writeString(smsc.c_str());
 
@@ -1467,7 +1523,7 @@ void RILRequest::writeSmsToRuim(int status, std::string pdu)
 
     obtain(RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM);
 
-    mParcel.writeInt(status);
+    mParcel.writeInt32(status);
     mParcel.writeString(pdu.c_str());
 
     if (false)
@@ -1485,7 +1541,7 @@ void RILRequest::setupDataCall(std::string radioTechnology, std::string profile,
 {
     obtain(RIL_REQUEST_SETUP_DATA_CALL);
 
-    mParcel.writeInt(7);
+    mParcel.writeInt32(7);
 
     mParcel.writeString(radioTechnology.c_str());
     mParcel.writeString(profile.c_str());
@@ -1510,7 +1566,7 @@ void RILRequest::deactivateDataCall(int cid, int reason)
 {
     obtain(RIL_REQUEST_DEACTIVATE_DATA_CALL);
 
-    mParcel.writeInt(2);
+    mParcel.writeInt32(2);
     mParcel.writeString(std::to_string(cid).c_str());
     mParcel.writeString(std::to_string(reason).c_str());
 
@@ -1528,8 +1584,8 @@ void RILRequest::setRadioPower(bool on)
 {
     obtain(RIL_REQUEST_RADIO_POWER);
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(on ? 1 : 0);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(on ? 1 : 0);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << (on ? " on" : " off") << ENDL;
 
@@ -1544,8 +1600,8 @@ void RILRequest::setSuppServiceNotifications(bool enable)
 {
     obtain(RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION);
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(enable ? 1 : 0);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(enable ? 1 : 0);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
@@ -1560,9 +1616,9 @@ void RILRequest::acknowledgeLastIncomingGsmSms(bool success, int cause)
 {
     obtain(RIL_REQUEST_SMS_ACKNOWLEDGE);
 
-    mParcel.writeInt(2);
-    mParcel.writeInt(success ? 1 : 0);
-    mParcel.writeInt(cause);
+    mParcel.writeInt32(2);
+    mParcel.writeInt32(success ? 1 : 0);
+    mParcel.writeInt32(cause);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << success << " " << cause << ENDL;
 
@@ -1577,9 +1633,9 @@ void RILRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause)
 {
     obtain(RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE);
 
-    mParcel.writeInt(success ? 0 : 1); //RIL_CDMA_SMS_EthisorClass
+    mParcel.writeInt32(success ? 0 : 1); //RIL_CDMA_SMS_EthisorClass
     // cause code according to X.S004-550E
-    mParcel.writeInt(cause);
+    mParcel.writeInt32(cause);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << success << " " << cause << ENDL;
 
@@ -1594,7 +1650,7 @@ void RILRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackP
 {
     obtain(RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU);
 
-    mParcel.writeInt(2);
+    mParcel.writeInt32(2);
     mParcel.writeString(success ? "1" : "0");
     mParcel.writeString(ackPdu.c_str());
 
@@ -1614,12 +1670,12 @@ void RILRequest::iccIO(int command, int fileid, std::string path, int p1, int p2
     //       but this request is also valid for SIM and RUIM
     obtain(RIL_REQUEST_SIM_IO);
 
-    mParcel.writeInt(command);
-    mParcel.writeInt(fileid);
+    mParcel.writeInt32(command);
+    mParcel.writeInt32(fileid);
     mParcel.writeString(path.c_str());
-    mParcel.writeInt(p1);
-    mParcel.writeInt(p2);
-    mParcel.writeInt(p3);
+    mParcel.writeInt32(p1);
+    mParcel.writeInt32(p2);
+    mParcel.writeInt32(p3);
     mParcel.writeString(data.c_str());
     mParcel.writeString(pin2.c_str());
 
@@ -1652,9 +1708,9 @@ void RILRequest::setCLIR(int clirMode)
     obtain(RIL_REQUEST_SET_CLIR);
 
     // count ints
-    mParcel.writeInt(1);
+    mParcel.writeInt32(1);
 
-    mParcel.writeInt(clirMode);
+    mParcel.writeInt32(clirMode);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << clirMode << ENDL;
 
@@ -1669,8 +1725,8 @@ void RILRequest::queryCallWaiting(int serviceClass)
 {
     obtain(RIL_REQUEST_QUERY_CALL_WAITING);
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(serviceClass);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(serviceClass);
 
     LOGD << requestidToString(getRequestId()) + "> "
          << commandidToString(getCommandId()) << " " << serviceClass << ENDL;
@@ -1686,9 +1742,9 @@ void RILRequest::setCallWaiting(bool enable, int serviceClass)
 {
     obtain(RIL_REQUEST_SET_CALL_WAITING);
 
-    mParcel.writeInt(2);
-    mParcel.writeInt(enable ? 1 : 0);
-    mParcel.writeInt(serviceClass);
+    mParcel.writeInt32(2);
+    mParcel.writeInt32(enable ? 1 : 0);
+    mParcel.writeInt32(serviceClass);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << enable << ", " << serviceClass << ENDL;
 
@@ -1758,12 +1814,12 @@ void RILRequest::setCallForward(int action, int cfReason, int serviceClass,
 {
     obtain(RIL_REQUEST_SET_CALL_FORWARD);
 
-    mParcel.writeInt(action);
-    mParcel.writeInt(cfReason);
-    mParcel.writeInt(serviceClass);
-    mParcel.writeInt(number.length());
+    mParcel.writeInt32(action);
+    mParcel.writeInt32(cfReason);
+    mParcel.writeInt32(serviceClass);
+    mParcel.writeInt32(number.length());
     mParcel.writeString(number.c_str());
-    mParcel.writeInt(timeSeconds);
+    mParcel.writeInt32(timeSeconds);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " "
          << action << " " << cfReason << " " << serviceClass << timeSeconds << ENDL;
@@ -1780,12 +1836,12 @@ void RILRequest::queryCallForwardStatus(int cfReason, int serviceClass,
 {
     obtain(RIL_REQUEST_QUERY_CALL_FORWARD_STATUS);
 
-    mParcel.writeInt(2); // 2 is for query action, not in used anyway
-    mParcel.writeInt(cfReason);
-    mParcel.writeInt(serviceClass);
-    mParcel.writeInt(number.length());
+    mParcel.writeInt32(2); // 2 is for query action, not in used anyway
+    mParcel.writeInt32(cfReason);
+    mParcel.writeInt32(serviceClass);
+    mParcel.writeInt32(number.length());
     mParcel.writeString(number.c_str());
-    mParcel.writeInt(0);
+    mParcel.writeInt32(0);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " "
          << cfReason << " " << serviceClass << ENDL;
@@ -1836,7 +1892,7 @@ void RILRequest::queryFacilityLockForApp(std::string facility, std::string passw
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     // count strings
-    mParcel.writeInt(4);
+    mParcel.writeInt32(4);
 
     mParcel.writeString(facility.c_str());
     mParcel.writeString(password.c_str());
@@ -1866,7 +1922,7 @@ void RILRequest::setFacilityLockForApp(std::string facility, bool lockState, std
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     // count strings
-    mParcel.writeInt(5);
+    mParcel.writeInt32(5);
 
     mParcel.writeString(facility.c_str());
     lockString = (lockState) ? "1" : "0";
@@ -1956,8 +2012,8 @@ void RILRequest::setBandMode(int bandMode)
 {
     obtain(RIL_REQUEST_SET_BAND_MODE);
 
-    mParcel.writeInt(1);
-    mParcel.writeInt(bandMode);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(bandMode);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << bandMode << ENDL;
 
@@ -2052,8 +2108,8 @@ void RILRequest::sendEnvelopeWithStatus(std::string contents)
 //     obtain(//         RIL_REQUEST_SET_PREFEthisED_NETWORK_TYPE,
 //         result);
 
-//     mParcel.writeInt(1);
-//     mParcel.writeInt(networkType);
+//     mParcel.writeInt32(1);
+//     mParcel.writeInt32(networkType);
 
 //     mSetPrefethisedNetworkType = networkType;
 //     mPrefethisedNetworkType = networkType;
@@ -2092,8 +2148,8 @@ void RILRequest::getNeighboringCids()
 void RILRequest::setLocationUpdates(bool enable)
 {
     obtain(RIL_REQUEST_SET_LOCATION_UPDATES);
-    mParcel.writeInt(1);
-    mParcel.writeInt(enable ? 1 : 0);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(enable ? 1 : 0);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ": " << enable << ENDL;
 
@@ -2135,8 +2191,8 @@ void RILRequest::setSmscAddress(std::string address)
 void RILRequest::reportSmsMemoryStatus(bool available)
 {
     obtain(RIL_REQUEST_REPORT_SMS_MEMORY_STATUS);
-    mParcel.writeInt(1);
-    mParcel.writeInt(available ? 1 : 0);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(available ? 1 : 0);
 
     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ": " << available << ENDL;
 
@@ -2160,18 +2216,18 @@ void RILRequest::reportStkServiceIsRunning()
     }
 }
 
-// void RILRequest::getGsmBroadcastConfig()
-// {
-//     obtain(RIL_REQUEST_GSM_GET_BROADCAST_CONFIG);
+void RILRequest::getGsmBroadcastConfig()
+{
+    obtain(RIL_REQUEST_GSM_GET_BROADCAST_SMS_CONFIG);
 
-//     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-//     if (!blockSend(this))
-//     {
-//         LOGE << "send request failed" << ENDL;
-//         return;
-//     }
-// }
+    if (!blockSend(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+}
 
 // void RILRequest::setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config)
 // {
@@ -2179,15 +2235,15 @@ void RILRequest::reportStkServiceIsRunning()
 //           result);
 
 //     int numOfConfig = config.length;
-//     mParcel.writeInt(numOfConfig);
+//     mParcel.writeInt32(numOfConfig);
 
 //     for (int i = 0; i < numOfConfig; i++)
 //     {
-//         mParcel.writeInt(config[i].getFromServiceId());
-//         mParcel.writeInt(config[i].getToServiceId());
-//         mParcel.writeInt(config[i].getFromCodeScheme());
-//         mParcel.writeInt(config[i].getToCodeScheme());
-//         mParcel.writeInt(config[i].isSelected() ? 1 : 0);
+//         mParcel.writeInt32(config[i].getFromServiceId());
+//         mParcel.writeInt32(config[i].getToServiceId());
+//         mParcel.writeInt32(config[i].getFromCodeScheme());
+//         mParcel.writeInt32(config[i].getToCodeScheme());
+//         mParcel.writeInt32(config[i].isSelected() ? 1 : 0);
 //     }
 
 //     {
@@ -2205,8 +2261,8 @@ void RILRequest::reportStkServiceIsRunning()
 // {
 //     obtain(RIL_REQUEST_GSM_BROADCAST_ACTIVATION);
 
-//     mParcel.writeInt(1);
-//     mParcel.writeInt(activate ? 0 : 1);
+//     mParcel.writeInt32(1);
+//     mParcel.writeInt32(activate ? 0 : 1);
 
 //     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
@@ -2222,8 +2278,8 @@ void RILRequest::reportStkServiceIsRunning()
 // void sendScreenState(bool on)
 // {
 //     obtain(//         RIL_REQUEST_SCREEN_STATE, null);
-//     mParcel.writeInt(1);
-//     mParcel.writeInt(on ? 1 : 0);
+//     mParcel.writeInt32(1);
+//     mParcel.writeInt32(on ? 1 : 0);
 //
 //         LOGD << equestidString(getRequestId()) + "> " << commandidToString(getCommandId()) <<  ": " + on);
 // if (!blockSend(this)){
@@ -2279,8 +2335,8 @@ void RILRequest::reportStkServiceIsRunning()
 // {
 //     obtain(//         RILConstants.RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE);
 
-//     this.mp.writeInt(1);
-//     this.mp.writeInt(cdmaRoamingType);
+//     this.mp.writeInt32(1);
+//     this.mp.writeInt32(cdmaRoamingType);
 
 //
 //         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + cdmaRoamingType);
@@ -2295,8 +2351,8 @@ void RILRequest::reportStkServiceIsRunning()
 // {
 //     obtain(//         RILConstants.RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE);
 
-//     this.mp.writeInt(1);
-//     this.mp.writeInt(cdmaSubscription);
+//     this.mp.writeInt32(1);
+//     this.mp.writeInt32(cdmaSubscription);
 
 //
 //         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + cdmaSubscription);
@@ -2336,8 +2392,8 @@ void RILRequest::reportStkServiceIsRunning()
 // {
 //     obtain(//         RILConstants.RIL_REQUEST_SET_TTY_MODE);
 
-//     this.mp.writeInt(1);
-//     this.mp.writeInt(ttyMode);
+//     this.mp.writeInt32(1);
+//     this.mp.writeInt32(ttyMode);
 
 //
 //         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + ttyMode);
@@ -2374,7 +2430,7 @@ void RILRequest::reportStkServiceIsRunning()
 
 //     for (int i = 0; i < configValuesAthisay.length; i++)
 //     {
-//         this.mp.writeInt(configValuesAthisay[i]);
+//         this.mp.writeInt32(configValuesAthisay[i]);
 //     }
 
 //
@@ -2387,8 +2443,8 @@ void RILRequest::reportStkServiceIsRunning()
 // {
 //     obtain(IL_REQUEST_CDMA_BROADCAST_ACTIVATION);
 
-//     this.mp.writeInt(1);
-//     this.mp.writeInt(activate ? 0 : 1);
+//     this.mp.writeInt32(1);
+//     this.mp.writeInt32(activate ? 0 : 1);
 
 //
 //         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
@@ -2423,17 +2479,19 @@ void RILRequest::reportStkServiceIsRunning()
 
 void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
 {
-    int error = p.readInt();
+    int error = p.readInt32();
 
-    // RilResponse resp;
+    if (error)
+        LOGE << "RESP < " << commandidToString(rr->getCommandId()) << " with error " << error << ENDL;
+    else
+        LOGI << "RESP < " << commandidToString(rr->getCommandId()) << ENDL;
 
-    // resp.setResponseID(getCommandId());
-    // resp.setResponseURCInfo(false);
-
+    rr->mResponse.setError(error);
+    rr->mResponse.setCommandId(rr->getCommandId());
+    rr->mResponse.setURC(false);
     if (error == 0 || p.dataAvail() > 0)
     {
         // either command succeeds or command fails but with data payload
-        LOGD << "RESP for < " << commandidToString(rr->getCommandId()) << " with error " << error << ENDL;
         auto processer = SocilitedProcesser.find(rr->getCommandId());
         if (processer != SocilitedProcesser.end())
         {
@@ -2444,22 +2502,22 @@ void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
             LOGE << "undefined response processer for " << commandidToString(rr->getCommandId()) << ENDL;
         }
     }
-    rr->mRequestCond.notify_one();
 }
 
 void RILRequest::processUnsolicited(Parcel &p)
 {
-    int cmdid = p.readInt();
+    int cmdid = p.readInt32();
 
-    // resp.setResponseID(cmdid);
-    // resp.setResponseURCInfo(true);
+    // rr->mResponse.setError(0);
+    // rr->mResponse.setCommandId(rr->getCommandId());
+    // rr->mResponse.setURC(false);
 
-    LOGD << "RESP < " << responseToString(cmdid) << ENDL;
+    LOGI << "RESP < " << responseToString(cmdid) << ENDL;
     // either command succeeds or command fails but with data payload
     auto processer = UnsocilitedProcesser.find(cmdid);
     if (processer != UnsocilitedProcesser.end())
     {
-        processer->second(p);
+        // processer->second(p);
     }
     else
     {

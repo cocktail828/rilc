@@ -5,10 +5,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <string.h>
 #include <linux/un.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <termio.h>
+#include <endian.h>
 
 #include "logger.h"
 #include "DeviceManager.h"
@@ -306,10 +308,7 @@ void DeviceManager::processResponse(void *data, size_t len)
     }
 
     p.setData(reinterpret_cast<uint8_t *>(data), len);
-
-    int type = p.readInt();
-
-    // process unsolicited myself */
+    int type = p.readInt32();
     if (type == RESPONSE_UNSOLICITED)
     {
         LOGD << "process unsocilited message" << ENDL;
@@ -319,7 +318,7 @@ void DeviceManager::processResponse(void *data, size_t len)
     {
         LOGD << "process socilited message" << ENDL;
         /* find the observer and notice him */
-        int rid = p.readInt();
+        int rid = p.readInt32();
         notify(rid, p);
     }
     else

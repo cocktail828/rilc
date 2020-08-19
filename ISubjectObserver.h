@@ -34,10 +34,11 @@ public:
     void attach(IObserver *o)
     {
         std::lock_guard<std::mutex> _lk(mListLock);
-        LOGD << "attach new observer: sn "
-             << o->getRequestId() << " cid "
-             << o->getCommandId() << ENDL;
         mObservers.emplace_back(o);
+        LOGD << "attach new observer(" + std::to_string(mObservers.size()) + ") sn "
+             << o->getRequestId() << " cid "
+             << o->getCommandId()
+             << ", list size " << mObservers.size() << ENDL;
     }
 
     void detach(IObserver *o)
@@ -47,10 +48,11 @@ public:
         {
             if ((*iter) == o)
             {
+                mObservers.erase(iter);
                 LOGD << "detach observer(" + std::to_string(mObservers.size()) + ") sn "
                      << o->getRequestId()
-                     << " cid " << o->getCommandId() << ENDL;
-                mObservers.erase(iter);
+                     << " cid " << o->getCommandId()
+                     << ", list size " << mObservers.size() << ENDL;
             }
             else
             {
@@ -86,8 +88,12 @@ public:
             IObserver *o = *iter;
             if (o->getRequestId() == rid)
             {
-                o->update(p);
                 mObservers.erase(iter);
+                LOGD << "detach observer(" + std::to_string(mObservers.size()) + ") sn "
+                     << o->getRequestId()
+                     << " cid " << o->getCommandId() << ENDL;
+                o->update(p);
+                break;
             }
         }
     }

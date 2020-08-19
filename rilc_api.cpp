@@ -74,13 +74,64 @@ int RILC_requestIMSI()
     return 0;
 }
 
-void RILC_TEST_REQ()
+#define ABORT_IF_ERROR(l)                                                      \
+    do                                                                         \
+    {                                                                          \
+        req.recycle();                                                         \
+        l;                                                                     \
+        if (req.mResponse.getError() || req.mResponse.getCommandId() == 0)     \
+        {                                                                      \
+            LOGE << "OOPS: request " << req.getCommandId() << " fail" << ENDL; \
+            abort();                                                           \
+        }                                                                      \
+    } while (0)
+
+void TEST_VOID_REQ()
 {
     RILRequest req;
+    /**
+     * request without parameters
+     */
 
-    // req.getIccCardStatus(); // android ok
-    // req.supplyIccPin("123");
-    // req.supplyIccPinForApp("123", "234");
+    ABORT_IF_ERROR(req.getIccCardStatus());
+    ABORT_IF_ERROR(req.getCurrentCalls());
+    ABORT_IF_ERROR(req.getDataCallList());
+    ABORT_IF_ERROR(req.getIMEI());
+    ABORT_IF_ERROR(req.getIMEISV());
+    ABORT_IF_ERROR(req.getLastDataCallFailCause());
+    ABORT_IF_ERROR(req.getMute());
+    ABORT_IF_ERROR(req.getSignalStrength());
+    ABORT_IF_ERROR(req.getVoiceRegistrationState());
+    ABORT_IF_ERROR(req.getDataRegistrationState());
+    ABORT_IF_ERROR(req.getOperator());
+    ABORT_IF_ERROR(req.stopDtmf());
+    ABORT_IF_ERROR(req.getCLIR());
+    ABORT_IF_ERROR(req.setNetworkSelectionModeAutomatic());
+    ABORT_IF_ERROR(req.getNetworkSelectionMode());
+    ABORT_IF_ERROR(req.getAvailableNetworks());
+    ABORT_IF_ERROR(req.queryCLIP());
+    ABORT_IF_ERROR(req.getBasebandVersion());
+    ABORT_IF_ERROR(req.cancelPendingUssd());
+    ABORT_IF_ERROR(req.resetRadio());
+    ABORT_IF_ERROR(req.queryAvailableBandMode());
+    ABORT_IF_ERROR(req.getPreferredNetworkType());
+    ABORT_IF_ERROR(req.getNeighboringCids());
+    ABORT_IF_ERROR(req.getSmscAddress());
+    ABORT_IF_ERROR(req.reportStkServiceIsRunning());
+    ABORT_IF_ERROR(req.getGsmBroadcastConfig());
+    ABORT_IF_ERROR(req.getIMSI()); // --------- error
+}
+
+void RILC_TEST_REQ()
+{
+    // TEST_VOID_REQ();
+
+    RILRequest req;
+    /**
+     * request with parameters
+     */
+    // req.supplyIccPin("1234");
+    // req.supplyIccPinForApp("1234", "2345");
     // req.supplyIccPuk(std::string puk, std::string newPin);
     // req.supplyIccPukForApp(std::string puk, std::string newPin, std::string aid);
     // req.supplyIccPin2(std::string pin);
@@ -92,20 +143,10 @@ void RILC_TEST_REQ()
     // req.changeIccPin2(std::string oldPin2, std::string newPin2);
     // req.changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid);
     // req.changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd);
-    // req.supplyNetworkDepersonalization(""); // android ok
-    // req.getCurrentCalls();
-
+    // req.supplyNetworkDepersonalization("");
     // __attribute_deprecated__ void getPDPContextList();
-    // req.getDataCallList();
-
-    // // req.dial(std::string address, int clirMode);
-
+    ABORT_IF_ERROR(req.dial("15510525846", 0));
     // // req.dial(std::string address, int clirMode, UUSInfo *uusInfo);
-    req.getIMSI();        // Android ok
-    req.recycle();
-    req.getIMEI();        // Android ok
-    req.recycle();
-    req.getIMEISV();        // Android ok
     // req.hangupConnection(int gsmIndex);
     // req.hangupWaitingOrBackground();
     // req.hangupForegroundResumeBackground();
@@ -120,16 +161,9 @@ void RILC_TEST_REQ()
     // req.getLastCallFailCause();
 
     // __attribute_deprecated__ void getLastPdpFailCause();
-    // req.getLastDataCallFailCause();
     // req.setMute(bool enableMute);
-    // req.getMute();
-    // req.getSignalStrength();
-    // req.getVoiceRegistrationState();
-    // req.getDataRegistrationState();
-    // req.getOperator();
     // req.sendDtmf(char c);
     // req.startDtmf(char c);
-    // req.stopDtmf();
     // req.sendBurstDtmf(std::string dtmfString, int on, int off);
     // req.sendSMS(std::string smscPDU, std::string pdu);
 
@@ -148,20 +182,14 @@ void RILC_TEST_REQ()
     // req.acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu);
     // req.iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
     //            std::string data, std::string pin2);
-    // req.getCLIR();
     // req.setCLIR(int clirMode);
     // req.queryCallWaiting(int serviceClass);
     // req.setCallWaiting(bool enable, int serviceClass);
-    // req.setNetworkSelectionModeAutomatic();
     // req.setNetworkSelectionModeManual(std::string operatorNumeric);
-    // req.getNetworkSelectionMode();
-    // req.getAvailableNetworks();
     // req.setCallForward(int action, int cfReason, int serviceClass,
     //                     std::string number, int timeSeconds);
     // req.queryCallForwardStatus(int cfReason, int serviceClass,
     //                             std::string number);
-    // req.queryCLIP();
-    // req.getBasebandVersion();
     // req.queryFacilityLock(std::string facility, std::string password, int serviceClass);
     // req.queryFacilityLockForApp(std::string facility, std::string password, int serviceClass, std::string appId);
     // req.setFacilityLock(std::string facility, bool lockState, std::string password,
@@ -169,32 +197,18 @@ void RILC_TEST_REQ()
     // req.setFacilityLockForApp(std::string facility, bool lockState, std::string password,
     //                            int serviceClass, std::string appId);
     // req.sendUSSD(std::string ussdString);
-
-    // // inherited javadoc suffice
-    // req.cancelPendingUssd();
-    // req.resetRadio();
-
     // // req.invokeOemRILRequestRaw(uint8_t *data);
-
     // // req.invokeOemRILRequestStrings(std::string[] strings);
     // req.setBandMode(int bandMode);
-    // req.queryAvailableBandMode();
     // req.sendTerminalResponse(std::string contents);
     // req.sendEnvelope(std::string contents);
     // req.sendEnvelopeWithStatus(std::string contents);
     // req.handleCallSetupRequestFromSim(bool accept);
-    // req.setCurrentPreferredNetworkType();
     // req.setPreferredNetworkType(int networkType);
-    // req.getPreferredNetworkType();
-    // req.getNeighboringCids();
     // req.setLocationUpdates(bool enable);
-    // req.getSmscAddress();
     // req.setSmscAddress(std::string address);
     // req.reportSmsMemoryStatus(bool available);
-    // req.reportStkServiceIsRunning();
-    // req.getGsmBroadcastConfig();
-
-    // // req.setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config);
+    // req.setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config);
     // req.setGsmBroadcastActivation(bool activate);
     return;
 }

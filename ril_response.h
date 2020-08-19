@@ -9,16 +9,6 @@
 #include "ril/ril.h"
 #include "parcel/parcel.h"
 
-class RilResponse
-{
-public:
-    int mError;
-    int mRequestId;
-    bool is_urc;
-
-public:
-};
-
 std::string responseToString(int respid);
 
 void responseVoid(Parcel &p);
