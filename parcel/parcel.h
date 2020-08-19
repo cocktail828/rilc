@@ -23,6 +23,8 @@ public:
 
     ~Parcel();
 
+    void recycle();
+
     status_t setData(const uint8_t *buffer, size_t len);
 
     const uint8_t *data() const;
@@ -65,6 +67,9 @@ public:
     status_t writeInt(int32_t val);
 
     status_t writeString(const char *str);
+
+    // template <typename... Args>
+    // status_t writeStrings(Args... args);
 
     void *writeInplace(size_t len);
 

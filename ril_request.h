@@ -13,7 +13,7 @@
 #endif
 
 #define RIL_MAX_BUFSIZE (1024 * 8)
-class RilRequest final : public IObserver
+class RILRequest final : public IObserver
 {
 private:
     /* class variables */
@@ -41,7 +41,7 @@ private:
     Parcel mParcel;
 
 public:
-    static RilRequest &instance();
+    static RILRequest &instance();
 
     static bool init(const char *device);
 
@@ -51,22 +51,22 @@ public:
 
     static void resetRequest();
 
-    static bool blockSend(RilRequest *);
+    static bool blockSend(RILRequest *);
 
     static void processUnsolicited(Parcel &);
 
-    static void processSolicited(RilRequest *rr, Parcel &);
+    static void processSolicited(RILRequest *rr, Parcel &);
 
     /**
      * the request must be an pointer
      * or coredump or other unexpected result will be get
      */
-    static bool nonblockSend(RilRequest *);
+    static bool nonblockSend(RILRequest *);
 
 public:
-    explicit RilRequest();
+    explicit RILRequest();
 
-    ~RilRequest();
+    ~RILRequest();
 
     void obtain(int cid);
 
@@ -76,6 +76,8 @@ public:
     int getRequestId();
 
     int getCommandId();
+
+    void recycle();
 
     /* RIL Requests */
 private:
@@ -249,9 +251,9 @@ public:
 
     void resetRadio();
 
-    // void invokeOemRilRequestRaw(uint8_t *data);
+    // void invokeOemRILRequestRaw(uint8_t *data);
 
-    // void invokeOemRilRequestStrings(std::string[] strings);
+    // void invokeOemRILRequestStrings(std::string[] strings);
 
     void setBandMode(int bandMode);
 
@@ -290,6 +292,6 @@ public:
     void setGsmBroadcastActivation(bool activate);
 };
 
-typedef RilRequest RILREQUEST;
+typedef RILRequest RILREQUEST;
 
 #endif //__RIL_REQUEST

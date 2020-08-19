@@ -4,13 +4,13 @@
 #include "ril_request.h"
 #include "ril_response.h"
 #include "logger.h"
-#include "ril.h"
+#include "ril/ril.h"
 
-DeviceManager *RilRequest::mDeviceMgr = nullptr;
-int RilRequest::mGlobalRequestId = 0;
+DeviceManager *RILRequest::mDeviceMgr = nullptr;
+int RILRequest::mGlobalRequestId = 0;
 ;
-bool RilRequest::mReady = false;
-std::mutex RilRequest::mGlobalLock;
+bool RILRequest::mReady = false;
+std::mutex RILRequest::mGlobalLock;
 
 static std::string requestidToString(int id)
 {
@@ -491,7 +491,7 @@ static std::string commandidToString(int cid)
 /**
  * use dto build an new request will only 'command id'
  */
-void RilRequest::obtain(int cid)
+void RILRequest::obtain(int cid)
 {
     mRequestId = ++mGlobalRequestId;
     mCommandId = cid;
@@ -511,9 +511,9 @@ void RilRequest::obtain(int cid)
  * which means, it's the same for all instances of the class.
  * for all instances shared the same DevciceManager and mGlobalRequestId
  */
-RilRequest &RilRequest::instance()
+RILRequest &RILRequest::instance()
 {
-    static RilRequest instance_;
+    static RILRequest instance_;
     return instance_;
 }
 
@@ -521,7 +521,7 @@ RilRequest &RilRequest::instance()
  * start a new polling thread for read.
  * the thread is need for reading response and send requests
  */
-bool RilRequest::init(const char *device)
+bool RILRequest::init(const char *device)
 {
     assert(device != nullptr);
 
@@ -548,7 +548,7 @@ bool RilRequest::init(const char *device)
 /**
  * clean up what is created in 'init' function
  */
-bool RilRequest::uninit()
+bool RILRequest::uninit()
 {
     if (mDeviceMgr && mDeviceMgr->closeDevice())
     {
@@ -563,13 +563,13 @@ bool RilRequest::uninit()
 /**
  * check whether the DeviceManager is ready for send and read
  */
-bool RilRequest::isReady()
+bool RILRequest::isReady()
 {
     mReady = mDeviceMgr && mDeviceMgr->isReady();
     return mReady;
 }
 
-void RilRequest::resetRequest()
+void RILRequest::resetRequest()
 {
     std::lock_guard<std::mutex> _lk(mGlobalLock);
     mGlobalRequestId = 0;
@@ -579,7 +579,7 @@ void RilRequest::resetRequest()
  * send requests. if success, the request will be add the observer list
  * so it can be notified, if it's response reachs
  */
-bool RilRequest::blockSend(RilRequest *rr)
+bool RILRequest::blockSend(RILRequest *rr)
 {
     std::unique_lock<std::mutex> _lk(rr->mRequestLock);
 
@@ -610,7 +610,7 @@ bool RilRequest::blockSend(RilRequest *rr)
     return false;
 }
 
-bool RilRequest::nonblockSend(RilRequest *rr)
+bool RILRequest::nonblockSend(RILRequest *rr)
 {
     std::unique_lock<std::mutex> _lk(rr->mRequestLock);
 
@@ -636,11 +636,11 @@ bool RilRequest::nonblockSend(RilRequest *rr)
     return false;
 }
 
-RilRequest::RilRequest()
+RILRequest::RILRequest()
 {
 }
 
-RilRequest::~RilRequest()
+RILRequest::~RILRequest()
 {
     /**
      * sometimes user may new an instance to make a request
@@ -653,7 +653,7 @@ RilRequest::~RilRequest()
 /**
  * When get some message from DeviceManager, this function will be called
  */
-void RilRequest::update(Parcel &p)
+void RILRequest::update(Parcel &p)
 {
     /* oops! device manager is destroyed */
     if (p.dataSize() == 0)
@@ -669,17 +669,22 @@ void RilRequest::update(Parcel &p)
     return;
 }
 
-int RilRequest::getRequestId()
+int RILRequest::getRequestId()
 {
     return mRequestId;
 }
 
-int RilRequest::getCommandId()
+int RILRequest::getCommandId()
 {
     return mCommandId;
 }
 
-void RilRequest::getIccCardStatus()
+void RILRequest::recycle()
+{
+    mParcel.recycle();
+}
+
+void RILRequest::getIccCardStatus()
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
@@ -693,12 +698,12 @@ void RilRequest::getIccCardStatus()
     }
 }
 
-void RilRequest::supplyIccPin(std::string pin)
+void RILRequest::supplyIccPin(std::string pin)
 {
     supplyIccPinForApp(pin, "");
 }
 
-void RilRequest::supplyIccPinForApp(std::string pin, std::string aid)
+void RILRequest::supplyIccPinForApp(std::string pin, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
@@ -717,12 +722,12 @@ void RilRequest::supplyIccPinForApp(std::string pin, std::string aid)
     }
 }
 
-void RilRequest::supplyIccPuk(std::string puk, std::string newPin)
+void RILRequest::supplyIccPuk(std::string puk, std::string newPin)
 {
     supplyIccPukForApp(puk, newPin, "");
 }
 
-void RilRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::string aid)
+void RILRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
@@ -742,12 +747,12 @@ void RilRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::st
     }
 }
 
-void RilRequest::supplyIccPin2(std::string pin)
+void RILRequest::supplyIccPin2(std::string pin)
 {
     supplyIccPin2ForApp(pin, "");
 }
 
-void RilRequest::supplyIccPin2ForApp(std::string pin, std::string aid)
+void RILRequest::supplyIccPin2ForApp(std::string pin, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
@@ -766,12 +771,12 @@ void RilRequest::supplyIccPin2ForApp(std::string pin, std::string aid)
     }
 }
 
-void RilRequest::supplyIccPuk2(std::string puk2, std::string newPin2)
+void RILRequest::supplyIccPuk2(std::string puk2, std::string newPin2)
 {
     supplyIccPuk2ForApp(puk2, newPin2, "");
 }
 
-void RilRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid)
+void RILRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
@@ -791,12 +796,12 @@ void RilRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::
     }
 }
 
-void RilRequest::changeIccPin(std::string oldPin, std::string newPin)
+void RILRequest::changeIccPin(std::string oldPin, std::string newPin)
 {
     changeIccPinForApp(oldPin, newPin, "");
 }
 
-void RilRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid)
+void RILRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
@@ -816,12 +821,12 @@ void RilRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std:
     }
 }
 
-void RilRequest::changeIccPin2(std::string oldPin2, std::string newPin2)
+void RILRequest::changeIccPin2(std::string oldPin2, std::string newPin2)
 {
     changeIccPin2ForApp(oldPin2, newPin2, "");
 }
 
-void RilRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid)
+void RILRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
@@ -841,7 +846,7 @@ void RilRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, s
     }
 }
 
-void RilRequest::changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd)
+void RILRequest::changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd)
 {
     obtain(RIL_REQUEST_CHANGE_BARRING_PASSWORD);
 
@@ -859,7 +864,7 @@ void RilRequest::changeBarringPassword(std::string facility, std::string oldPwd,
     }
 }
 
-void RilRequest::supplyNetworkDepersonalization(std::string netpin)
+void RILRequest::supplyNetworkDepersonalization(std::string netpin)
 {
     obtain(RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION);
 
@@ -875,7 +880,7 @@ void RilRequest::supplyNetworkDepersonalization(std::string netpin)
     }
 }
 
-void RilRequest::getCurrentCalls()
+void RILRequest::getCurrentCalls()
 {
     obtain(RIL_REQUEST_GET_CURRENT_CALLS);
 
@@ -888,12 +893,12 @@ void RilRequest::getCurrentCalls()
     }
 }
 
-__attribute_deprecated__ void RilRequest::getPDPContextList()
+__attribute_deprecated__ void RILRequest::getPDPContextList()
 {
     getDataCallList();
 }
 
-void RilRequest::getDataCallList()
+void RILRequest::getDataCallList()
 {
     obtain(RIL_REQUEST_DATA_CALL_LIST);
 
@@ -906,12 +911,12 @@ void RilRequest::getDataCallList()
     }
 }
 
-// void RilRequest::dial(std::string address, int clirMode)
+// void RILRequest::dial(std::string address, int clirMode)
 // {
 //     dial(address, clirMode, "");
 // }
 
-// void RilRequest::dial(std::string address, int clirMode, UUSInfo *uusInfo)
+// void RILRequest::dial(std::string address, int clirMode, UUSInfo *uusInfo)
 // {
 //     obtain(//              RIL_REQUEST_DIAL);
 
@@ -935,7 +940,7 @@ void RilRequest::getDataCallList()
 //     if (!blockSend(this)){
 // }
 
-void RilRequest::getIMSI()
+void RILRequest::getIMSI()
 {
     obtain(RIL_REQUEST_GET_IMSI);
 
@@ -949,7 +954,7 @@ void RilRequest::getIMSI()
     }
 }
 
-void RilRequest::getIMEI()
+void RILRequest::getIMEI()
 {
     obtain(RIL_REQUEST_GET_IMEI);
 
@@ -962,7 +967,7 @@ void RilRequest::getIMEI()
     }
 }
 
-void RilRequest::getIMEISV()
+void RILRequest::getIMEISV()
 {
     obtain(RIL_REQUEST_GET_IMEISV);
 
@@ -975,7 +980,7 @@ void RilRequest::getIMEISV()
     }
 }
 
-void RilRequest::hangupConnection(int gsmIndex)
+void RILRequest::hangupConnection(int gsmIndex)
 {
     LOGFW("hangupConnection: gsmIndex = ", gsmIndex);
 
@@ -993,7 +998,7 @@ void RilRequest::hangupConnection(int gsmIndex)
     }
 }
 
-void RilRequest::hangupWaitingOrBackground()
+void RILRequest::hangupWaitingOrBackground()
 {
     obtain(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND);
 
@@ -1006,7 +1011,7 @@ void RilRequest::hangupWaitingOrBackground()
     }
 }
 
-void RilRequest::hangupForegroundResumeBackground()
+void RILRequest::hangupForegroundResumeBackground()
 {
     obtain(RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND);
 
@@ -1019,7 +1024,7 @@ void RilRequest::hangupForegroundResumeBackground()
     }
 }
 
-void RilRequest::switchWaitingOrHoldingAndActive()
+void RILRequest::switchWaitingOrHoldingAndActive()
 {
     obtain(RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE);
 
@@ -1032,7 +1037,7 @@ void RilRequest::switchWaitingOrHoldingAndActive()
     }
 }
 
-void RilRequest::conference()
+void RILRequest::conference()
 {
     obtain(RIL_REQUEST_CONFERENCE);
 
@@ -1045,7 +1050,7 @@ void RilRequest::conference()
     }
 }
 
-void RilRequest::setPreferredVoicePrivacy(bool enable)
+void RILRequest::setPreferredVoicePrivacy(bool enable)
 {
     obtain(RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE);
 
@@ -1059,7 +1064,7 @@ void RilRequest::setPreferredVoicePrivacy(bool enable)
     }
 }
 
-void RilRequest::getPreferredVoicePrivacy()
+void RILRequest::getPreferredVoicePrivacy()
 {
     obtain(RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE);
     if (!blockSend(this))
@@ -1069,7 +1074,7 @@ void RilRequest::getPreferredVoicePrivacy()
     }
 }
 
-void RilRequest::separateConnection(int gsmIndex)
+void RILRequest::separateConnection(int gsmIndex)
 {
     obtain(RIL_REQUEST_SEPARATE_CONNECTION);
 
@@ -1085,7 +1090,7 @@ void RilRequest::separateConnection(int gsmIndex)
     }
 }
 
-void RilRequest::acceptCall()
+void RILRequest::acceptCall()
 {
     obtain(RIL_REQUEST_ANSWER);
 
@@ -1098,7 +1103,7 @@ void RilRequest::acceptCall()
     }
 }
 
-void RilRequest::rejectCall()
+void RILRequest::rejectCall()
 {
     obtain(RIL_REQUEST_UDUB);
 
@@ -1111,7 +1116,7 @@ void RilRequest::rejectCall()
     }
 }
 
-void RilRequest::explicitCallTransfer()
+void RILRequest::explicitCallTransfer()
 {
     obtain(RIL_REQUEST_EXPLICIT_CALL_TRANSFER);
 
@@ -1124,7 +1129,7 @@ void RilRequest::explicitCallTransfer()
     }
 }
 
-void RilRequest::getLastCallFailCause()
+void RILRequest::getLastCallFailCause()
 {
     obtain(RIL_REQUEST_LAST_CALL_FAIL_CAUSE);
 
@@ -1137,7 +1142,7 @@ void RilRequest::getLastCallFailCause()
     }
 }
 
-__attribute_deprecated__ void RilRequest::getLastPdpFailCause()
+__attribute_deprecated__ void RILRequest::getLastPdpFailCause()
 {
     getLastDataCallFailCause();
 }
@@ -1145,7 +1150,7 @@ __attribute_deprecated__ void RilRequest::getLastPdpFailCause()
 /**
  * The prefethised new(std::nothrow) alternative to getLastPdpFailCause
  */
-void RilRequest::getLastDataCallFailCause()
+void RILRequest::getLastDataCallFailCause()
 {
     obtain(RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE);
 
@@ -1158,7 +1163,7 @@ void RilRequest::getLastDataCallFailCause()
     }
 }
 
-void RilRequest::setMute(bool enableMute)
+void RILRequest::setMute(bool enableMute)
 {
     obtain(RIL_REQUEST_SET_MUTE);
 
@@ -1174,7 +1179,7 @@ void RilRequest::setMute(bool enableMute)
     }
 }
 
-void RilRequest::getMute()
+void RILRequest::getMute()
 {
     obtain(RIL_REQUEST_GET_MUTE);
 
@@ -1187,7 +1192,7 @@ void RilRequest::getMute()
     }
 }
 
-void RilRequest::getSignalStrength()
+void RILRequest::getSignalStrength()
 {
     obtain(RIL_REQUEST_SIGNAL_STRENGTH);
 
@@ -1200,7 +1205,7 @@ void RilRequest::getSignalStrength()
     }
 }
 
-void RilRequest::getVoiceRegistrationState()
+void RILRequest::getVoiceRegistrationState()
 {
     obtain(RIL_REQUEST_VOICE_REGISTRATION_STATE);
 
@@ -1213,7 +1218,7 @@ void RilRequest::getVoiceRegistrationState()
     }
 }
 
-void RilRequest::getDataRegistrationState()
+void RILRequest::getDataRegistrationState()
 {
     obtain(RIL_REQUEST_DATA_REGISTRATION_STATE);
 
@@ -1226,7 +1231,7 @@ void RilRequest::getDataRegistrationState()
     }
 }
 
-void RilRequest::getOperator()
+void RILRequest::getOperator()
 {
     obtain(RIL_REQUEST_OPERATOR);
 
@@ -1239,7 +1244,7 @@ void RilRequest::getOperator()
     }
 }
 
-void RilRequest::sendDtmf(char c)
+void RILRequest::sendDtmf(char c)
 {
     obtain(RIL_REQUEST_DTMF);
 
@@ -1254,7 +1259,7 @@ void RilRequest::sendDtmf(char c)
     }
 }
 
-void RilRequest::startDtmf(char c)
+void RILRequest::startDtmf(char c)
 {
     obtain(RIL_REQUEST_DTMF_START);
 
@@ -1269,7 +1274,7 @@ void RilRequest::startDtmf(char c)
     }
 }
 
-void RilRequest::stopDtmf()
+void RILRequest::stopDtmf()
 {
     obtain(RIL_REQUEST_DTMF_STOP);
 
@@ -1282,7 +1287,7 @@ void RilRequest::stopDtmf()
     }
 }
 
-void RilRequest::sendBurstDtmf(std::string dtmfString, int on, int off)
+void RILRequest::sendBurstDtmf(std::string dtmfString, int on, int off)
 {
     obtain(RIL_REQUEST_CDMA_BURST_DTMF);
 
@@ -1300,7 +1305,7 @@ void RilRequest::sendBurstDtmf(std::string dtmfString, int on, int off)
     }
 }
 
-void RilRequest::sendSMS(std::string smscPDU, std::string pdu)
+void RILRequest::sendSMS(std::string smscPDU, std::string pdu)
 {
     obtain(RIL_REQUEST_SEND_SMS);
 
@@ -1317,7 +1322,7 @@ void RilRequest::sendSMS(std::string smscPDU, std::string pdu)
     }
 }
 
-// void RilRequest::sendCdmaSms(uint8_t *pdu)
+// void RILRequest::sendCdmaSms(uint8_t *pdu)
 // {
 //     int address_nbr_of_digits;
 //     int subaddr_nbr_of_digits;
@@ -1370,7 +1375,7 @@ void RilRequest::sendSMS(std::string smscPDU, std::string pdu)
 //     mResponse = result;
 // }
 
-void RilRequest::deleteSmsOnSim(int index)
+void RILRequest::deleteSmsOnSim(int index)
 {
     obtain(RIL_REQUEST_DELETE_SMS_ON_SIM);
 
@@ -1387,7 +1392,7 @@ void RilRequest::deleteSmsOnSim(int index)
     }
 }
 
-void RilRequest::deleteSmsOnRuim(int index)
+void RILRequest::deleteSmsOnRuim(int index)
 {
     obtain(RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM);
 
@@ -1418,7 +1423,7 @@ static const int STATUS_ON_ICC_SENT = 5;
 
 /** Stored and unsent (TS 51.011 10.5.3 / 3GPP2 C.S0023 3.4.27). */
 static const int STATUS_ON_ICC_UNSENT = 7;
-int RilRequest::translateStatus(int status)
+int RILRequest::translateStatus(int status)
 {
     switch (status & 0x7)
     {
@@ -1436,7 +1441,7 @@ int RilRequest::translateStatus(int status)
     return 1;
 }
 
-void RilRequest::writeSmsToSim(int status, std::string smsc, std::string pdu)
+void RILRequest::writeSmsToSim(int status, std::string smsc, std::string pdu)
 {
     status = translateStatus(status);
 
@@ -1456,7 +1461,7 @@ void RilRequest::writeSmsToSim(int status, std::string smsc, std::string pdu)
     }
 }
 
-void RilRequest::writeSmsToRuim(int status, std::string pdu)
+void RILRequest::writeSmsToRuim(int status, std::string pdu)
 {
     status = translateStatus(status);
 
@@ -1475,7 +1480,7 @@ void RilRequest::writeSmsToRuim(int status, std::string pdu)
     }
 }
 
-void RilRequest::setupDataCall(std::string radioTechnology, std::string profile, std::string apn,
+void RILRequest::setupDataCall(std::string radioTechnology, std::string profile, std::string apn,
                                std::string user, std::string password, std::string authType, std::string protocol)
 {
     obtain(RIL_REQUEST_SETUP_DATA_CALL);
@@ -1501,7 +1506,7 @@ void RilRequest::setupDataCall(std::string radioTechnology, std::string profile,
     }
 }
 
-void RilRequest::deactivateDataCall(int cid, int reason)
+void RILRequest::deactivateDataCall(int cid, int reason)
 {
     obtain(RIL_REQUEST_DEACTIVATE_DATA_CALL);
 
@@ -1519,7 +1524,7 @@ void RilRequest::deactivateDataCall(int cid, int reason)
     }
 }
 
-void RilRequest::setRadioPower(bool on)
+void RILRequest::setRadioPower(bool on)
 {
     obtain(RIL_REQUEST_RADIO_POWER);
 
@@ -1535,7 +1540,7 @@ void RilRequest::setRadioPower(bool on)
     }
 }
 
-void RilRequest::setSuppServiceNotifications(bool enable)
+void RILRequest::setSuppServiceNotifications(bool enable)
 {
     obtain(RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION);
 
@@ -1551,7 +1556,7 @@ void RilRequest::setSuppServiceNotifications(bool enable)
     }
 }
 
-void RilRequest::acknowledgeLastIncomingGsmSms(bool success, int cause)
+void RILRequest::acknowledgeLastIncomingGsmSms(bool success, int cause)
 {
     obtain(RIL_REQUEST_SMS_ACKNOWLEDGE);
 
@@ -1568,7 +1573,7 @@ void RilRequest::acknowledgeLastIncomingGsmSms(bool success, int cause)
     }
 }
 
-void RilRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause)
+void RILRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause)
 {
     obtain(RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE);
 
@@ -1585,7 +1590,7 @@ void RilRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause)
     }
 }
 
-void RilRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu)
+void RILRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu)
 {
     obtain(RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU);
 
@@ -1602,7 +1607,7 @@ void RilRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackP
     }
 }
 
-void RilRequest::iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
+void RILRequest::iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
                        std::string data, std::string pin2)
 {
     //Note: This RIL request has not been renamed to ICC,
@@ -1629,7 +1634,7 @@ void RilRequest::iccIO(int command, int fileid, std::string path, int p1, int p2
     }
 }
 
-void RilRequest::getCLIR()
+void RILRequest::getCLIR()
 {
     obtain(RIL_REQUEST_GET_CLIR);
 
@@ -1642,7 +1647,7 @@ void RilRequest::getCLIR()
     }
 }
 
-void RilRequest::setCLIR(int clirMode)
+void RILRequest::setCLIR(int clirMode)
 {
     obtain(RIL_REQUEST_SET_CLIR);
 
@@ -1660,7 +1665,7 @@ void RilRequest::setCLIR(int clirMode)
     }
 }
 
-void RilRequest::queryCallWaiting(int serviceClass)
+void RILRequest::queryCallWaiting(int serviceClass)
 {
     obtain(RIL_REQUEST_QUERY_CALL_WAITING);
 
@@ -1677,7 +1682,7 @@ void RilRequest::queryCallWaiting(int serviceClass)
     }
 }
 
-void RilRequest::setCallWaiting(bool enable, int serviceClass)
+void RILRequest::setCallWaiting(bool enable, int serviceClass)
 {
     obtain(RIL_REQUEST_SET_CALL_WAITING);
 
@@ -1694,7 +1699,7 @@ void RilRequest::setCallWaiting(bool enable, int serviceClass)
     }
 }
 
-void RilRequest::setNetworkSelectionModeAutomatic()
+void RILRequest::setNetworkSelectionModeAutomatic()
 {
     obtain(RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC);
 
@@ -1707,7 +1712,7 @@ void RilRequest::setNetworkSelectionModeAutomatic()
     }
 }
 
-void RilRequest::setNetworkSelectionModeManual(std::string operatorNumeric)
+void RILRequest::setNetworkSelectionModeManual(std::string operatorNumeric)
 {
     obtain(RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL);
 
@@ -1722,7 +1727,7 @@ void RilRequest::setNetworkSelectionModeManual(std::string operatorNumeric)
     }
 }
 
-void RilRequest::getNetworkSelectionMode()
+void RILRequest::getNetworkSelectionMode()
 {
     obtain(RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE);
 
@@ -1735,7 +1740,7 @@ void RilRequest::getNetworkSelectionMode()
     }
 }
 
-void RilRequest::getAvailableNetworks()
+void RILRequest::getAvailableNetworks()
 {
     obtain(RIL_REQUEST_QUERY_AVAILABLE_NETWORKS);
 
@@ -1748,7 +1753,7 @@ void RilRequest::getAvailableNetworks()
     }
 }
 
-void RilRequest::setCallForward(int action, int cfReason, int serviceClass,
+void RILRequest::setCallForward(int action, int cfReason, int serviceClass,
                                 std::string number, int timeSeconds)
 {
     obtain(RIL_REQUEST_SET_CALL_FORWARD);
@@ -1770,7 +1775,7 @@ void RilRequest::setCallForward(int action, int cfReason, int serviceClass,
     }
 }
 
-void RilRequest::queryCallForwardStatus(int cfReason, int serviceClass,
+void RILRequest::queryCallForwardStatus(int cfReason, int serviceClass,
                                         std::string number)
 {
     obtain(RIL_REQUEST_QUERY_CALL_FORWARD_STATUS);
@@ -1792,7 +1797,7 @@ void RilRequest::queryCallForwardStatus(int cfReason, int serviceClass,
     }
 }
 
-void RilRequest::queryCLIP()
+void RILRequest::queryCLIP()
 {
     obtain(RIL_REQUEST_QUERY_CLIP);
 
@@ -1805,7 +1810,7 @@ void RilRequest::queryCLIP()
     }
 }
 
-void RilRequest::getBasebandVersion()
+void RILRequest::getBasebandVersion()
 {
     obtain(RIL_REQUEST_BASEBAND_VERSION);
 
@@ -1818,12 +1823,12 @@ void RilRequest::getBasebandVersion()
     }
 }
 
-void RilRequest::queryFacilityLock(std::string facility, std::string password, int serviceClass)
+void RILRequest::queryFacilityLock(std::string facility, std::string password, int serviceClass)
 {
     queryFacilityLockForApp(facility, password, serviceClass, "");
 }
 
-void RilRequest::queryFacilityLockForApp(std::string facility, std::string password,
+void RILRequest::queryFacilityLockForApp(std::string facility, std::string password,
                                          int serviceClass, std::string appId)
 {
     obtain(RIL_REQUEST_QUERY_FACILITY_LOCK);
@@ -1846,13 +1851,13 @@ void RilRequest::queryFacilityLockForApp(std::string facility, std::string passw
     }
 }
 
-void RilRequest::setFacilityLock(std::string facility, bool lockState, std::string password,
+void RILRequest::setFacilityLock(std::string facility, bool lockState, std::string password,
                                  int serviceClass)
 {
     setFacilityLockForApp(facility, lockState, password, serviceClass, "");
 }
 
-void RilRequest::setFacilityLockForApp(std::string facility, bool lockState, std::string password,
+void RILRequest::setFacilityLockForApp(std::string facility, bool lockState, std::string password,
                                        int serviceClass, std::string appId)
 {
     std::string lockString;
@@ -1877,7 +1882,7 @@ void RilRequest::setFacilityLockForApp(std::string facility, bool lockState, std
     }
 }
 
-void RilRequest::sendUSSD(std::string ussdString)
+void RILRequest::sendUSSD(std::string ussdString)
 {
     obtain(RIL_REQUEST_SEND_USSD);
 
@@ -1892,7 +1897,7 @@ void RilRequest::sendUSSD(std::string ussdString)
     }
 }
 
-void RilRequest::cancelPendingUssd()
+void RILRequest::cancelPendingUssd()
 {
     obtain(RIL_REQUEST_CANCEL_USSD);
 
@@ -1905,7 +1910,7 @@ void RilRequest::cancelPendingUssd()
     }
 }
 
-void RilRequest::resetRadio()
+void RILRequest::resetRadio()
 {
     obtain(RIL_REQUEST_RESET_RADIO);
 
@@ -1918,7 +1923,7 @@ void RilRequest::resetRadio()
     }
 }
 
-// void RilRequest::invokeOemRilRequestRaw(uint8_t *data)
+// void RILRequest::invokeOemRilRequestRaw(uint8_t *data)
 // {
 //     obtain(//               RIL_REQUEST_OEM_HOOK_RAW,
 //               result);
@@ -1930,7 +1935,7 @@ void RilRequest::resetRadio()
 //     mResponse = result;
 // }
 
-// void RilRequest::invokeOemRilRequestStrings(std::string[] strings)
+// void RILRequest::invokeOemRilRequestStrings(std::string[] strings)
 // {
 //     obtain(//                 RIL_REQUEST_OEM_HOOK_STRINGS);
 
@@ -1947,7 +1952,7 @@ void RilRequest::resetRadio()
  * @param bandMode one of BM_*_BAND
  * @param response is callback message
  */
-void RilRequest::setBandMode(int bandMode)
+void RILRequest::setBandMode(int bandMode)
 {
     obtain(RIL_REQUEST_SET_BAND_MODE);
 
@@ -1971,7 +1976,7 @@ void RilRequest::setBandMode(int bandMode)
  *        ((AsyncResult)response.obj).result  is an int[] with every
  *        element representing one avialable BM_*_BAND
  */
-void RilRequest::queryAvailableBandMode()
+void RILRequest::queryAvailableBandMode()
 {
     obtain(RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE);
 
@@ -1984,7 +1989,7 @@ void RilRequest::queryAvailableBandMode()
     }
 }
 
-void RilRequest::sendTerminalResponse(std::string contents)
+void RILRequest::sendTerminalResponse(std::string contents)
 {
     obtain(RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE);
 
@@ -1998,7 +2003,7 @@ void RilRequest::sendTerminalResponse(std::string contents)
     }
 }
 
-void RilRequest::sendEnvelope(std::string contents)
+void RILRequest::sendEnvelope(std::string contents)
 {
     obtain(RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND);
 
@@ -2012,7 +2017,7 @@ void RilRequest::sendEnvelope(std::string contents)
     }
 }
 
-void RilRequest::sendEnvelopeWithStatus(std::string contents)
+void RILRequest::sendEnvelopeWithStatus(std::string contents)
 {
     obtain(RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS);
 
@@ -2026,7 +2031,7 @@ void RilRequest::sendEnvelopeWithStatus(std::string contents)
     }
 }
 
-// void RilRequest::handleCallSetupRequestFromSim(
+// void RILRequest::handleCallSetupRequestFromSim(
 //     bool accept)
 // {
 
@@ -2042,7 +2047,7 @@ void RilRequest::sendEnvelopeWithStatus(std::string contents)
 //     mResponse = result;
 // }
 
-// void RilRequest::setPrefethisedNetworkType(int networkType)
+// void RILRequest::setPrefethisedNetworkType(int networkType)
 // {
 //     obtain(//         RIL_REQUEST_SET_PREFEthisED_NETWORK_TYPE,
 //         result);
@@ -2058,7 +2063,7 @@ void RilRequest::sendEnvelopeWithStatus(std::string contents)
 //         mResponse = result;
 // }
 
-void RilRequest::getPreferredNetworkType()
+void RILRequest::getPreferredNetworkType()
 {
     obtain(RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE);
 
@@ -2071,7 +2076,7 @@ void RilRequest::getPreferredNetworkType()
     }
 }
 
-void RilRequest::getNeighboringCids()
+void RILRequest::getNeighboringCids()
 {
     obtain(RIL_REQUEST_GET_NEIGHBORING_CELL_IDS);
 
@@ -2084,7 +2089,7 @@ void RilRequest::getNeighboringCids()
     }
 }
 
-void RilRequest::setLocationUpdates(bool enable)
+void RILRequest::setLocationUpdates(bool enable)
 {
     obtain(RIL_REQUEST_SET_LOCATION_UPDATES);
     mParcel.writeInt(1);
@@ -2099,7 +2104,7 @@ void RilRequest::setLocationUpdates(bool enable)
     }
 }
 
-void RilRequest::getSmscAddress()
+void RILRequest::getSmscAddress()
 {
     obtain(RIL_REQUEST_GET_SMSC_ADDRESS);
 
@@ -2112,7 +2117,7 @@ void RilRequest::getSmscAddress()
     }
 }
 
-void RilRequest::setSmscAddress(std::string address)
+void RILRequest::setSmscAddress(std::string address)
 {
     obtain(RIL_REQUEST_SET_SMSC_ADDRESS);
 
@@ -2127,7 +2132,7 @@ void RilRequest::setSmscAddress(std::string address)
     }
 }
 
-void RilRequest::reportSmsMemoryStatus(bool available)
+void RILRequest::reportSmsMemoryStatus(bool available)
 {
     obtain(RIL_REQUEST_REPORT_SMS_MEMORY_STATUS);
     mParcel.writeInt(1);
@@ -2142,7 +2147,7 @@ void RilRequest::reportSmsMemoryStatus(bool available)
     }
 }
 
-void RilRequest::reportStkServiceIsRunning()
+void RILRequest::reportStkServiceIsRunning()
 {
     obtain(RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING);
 
@@ -2155,7 +2160,7 @@ void RilRequest::reportStkServiceIsRunning()
     }
 }
 
-// void RilRequest::getGsmBroadcastConfig()
+// void RILRequest::getGsmBroadcastConfig()
 // {
 //     obtain(RIL_REQUEST_GSM_GET_BROADCAST_CONFIG);
 
@@ -2168,7 +2173,7 @@ void RilRequest::reportStkServiceIsRunning()
 //     }
 // }
 
-// void RilRequest::setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config)
+// void RILRequest::setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config)
 // {
 //     obtain(//           RIL_REQUEST_GSM_SET_BROADCAST_CONFIG,
 //           result);
@@ -2196,7 +2201,7 @@ void RilRequest::reportStkServiceIsRunning()
 //     mResponse = result;
 // }
 
-// void RilRequest::setGsmBroadcastActivation(bool activate)
+// void RILRequest::setGsmBroadcastActivation(bool activate)
 // {
 //     obtain(RIL_REQUEST_GSM_BROADCAST_ACTIVATION);
 
@@ -2416,7 +2421,7 @@ void RilRequest::reportStkServiceIsRunning()
 // }
 // }
 
-void RilRequest::processSolicited(RilRequest *rr, Parcel &p)
+void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
 {
     int error = p.readInt();
 
@@ -2428,7 +2433,7 @@ void RilRequest::processSolicited(RilRequest *rr, Parcel &p)
     if (error == 0 || p.dataAvail() > 0)
     {
         // either command succeeds or command fails but with data payload
-        LOGD << "RESP for < " << commandidToString(rr->getCommandId()) << ENDL;
+        LOGD << "RESP for < " << commandidToString(rr->getCommandId()) << " with error " << error << ENDL;
         auto processer = SocilitedProcesser.find(rr->getCommandId());
         if (processer != SocilitedProcesser.end())
         {
@@ -2442,7 +2447,7 @@ void RilRequest::processSolicited(RilRequest *rr, Parcel &p)
     rr->mRequestCond.notify_one();
 }
 
-void RilRequest::processUnsolicited(Parcel &p)
+void RILRequest::processUnsolicited(Parcel &p)
 {
     int cmdid = p.readInt();
 

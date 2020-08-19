@@ -31,7 +31,7 @@ void responseInts(Parcel &p)
 
     numInts = p.readInt();
 
-    LOGI << "UNMARSHAL";
+    LOGI << "UNMARSHAL: ";
     for (int i = 0; i < numInts; i++)
     {
         int data = p.readInt();

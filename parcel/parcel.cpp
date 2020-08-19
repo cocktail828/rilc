@@ -17,6 +17,17 @@ Parcel::~Parcel()
     }
 }
 
+void Parcel::recycle()
+{
+    if (mData)
+        free(mData);
+
+    mData = NULL;
+    mDataSize = 0;
+    mDataCapacity = 0;
+    mDataPos = 0;
+}
+
 const uint8_t *Parcel::data() const
 {
     return mData;
@@ -248,7 +259,7 @@ status_t Parcel::writeString(const char *str)
     size_t s16_len;
     char16_t *str16 = strdup8to16(str, &s16_len);
 
-    if (str16 == NULL)
+    if (str16 == NULL || strlen(str) == 0)
         return writeInt(-1);
 
     status_t err = writeInt(s16_len);
@@ -267,6 +278,32 @@ status_t Parcel::writeString(const char *str)
     free(str16);
     return err;
 }
+
+// template <typename... args>
+// status_t Parcel::writeString()
+// {
+//     size_t s16_len;
+//     char16_t *str16 = strdup8to16(str, &s16_len);
+
+//     if (str16 == NULL)
+//         return writeInt(-1);
+
+//     status_t err = writeInt(s16_len);
+//     if (err == NO_ERROR)
+//     {
+//         s16_len *= sizeof(char16_t);
+//         uint8_t *data = (uint8_t *)writeInplace(s16_len + sizeof(char16_t));
+//         if (data)
+//         {
+//             memcpy(data, str16, s16_len);
+//             *reinterpret_cast<char16_t *>(data + s16_len) = 0;
+//             free(str16);
+//             return NO_ERROR;
+//         }
+//     }
+//     free(str16);
+//     return err;
+// }
 
 void *Parcel::writeInplace(size_t len)
 {

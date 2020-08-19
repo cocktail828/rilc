@@ -78,7 +78,7 @@ void pollingRead(DeviceManager *args)
                             length = MAX_RILD_DATA_SIZE - 1;
                         }
                         // read message body
-                        if (args->recvAsync(recvBuff, length, &olen))
+                        if (args->recvAsync(recvBuff, length, &olen) && olen > 0)
                             args->processResponse(recvBuff, olen);
                         else
                             LOGE << "read response data failed" << ENDL;
@@ -95,6 +95,7 @@ quit_polling:
     close(epfd);
     LOGW << "polling thread quit polling" << ENDL;
     args->mReady = false;
+    args->processResponse(nullptr, 0);
 }
 
 DeviceManager::DeviceManager(const char *d)
@@ -299,7 +300,8 @@ void DeviceManager::processResponse(void *data, size_t len)
 
     if (len == 0)
     {
-        LOGD << "response should not has length of zero" << ENDL;
+        LOGD << "polling thread may quit" << ENDL;
+        detachAll();
         return;
     }
 
