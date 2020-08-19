@@ -9,12 +9,12 @@ void responseStrings(Parcel &p)
     std::vector<std::string> response;
 
     num = p.readInt32();
-    // for (int i = 0; i < num; i++)
-    // {
-    //     auto str = p.readString();
-    //     response.emplace_back(str == NULL ? "" : str);
-    //     p.freeString(str);
-    // }
+    for (int i = 0; i < num; i++)
+    {
+        auto str = p.readString();
+        response.emplace_back(str == NULL ? "" : str);
+        p.freeString(str);
+    }
 
     LOGI << "UNMARSHAL: num of string " << num << ENDL;
     LOGI << "UNMARSHAL: ";
@@ -25,11 +25,11 @@ void responseStrings(Parcel &p)
 
 void responseString(Parcel &p)
 {
-    // const char *response = p.readString();
-    // std::string mRespString = response;
-    // p.freeString(response);
+    const char *response = p.readString();
+    std::string mRespString = response;
+    p.freeString(response);
 
-    // LOGI << "UNMARSHAL: " << mRespString << ENDL;
+    LOGI << "UNMARSHAL: " << mRespString << ENDL;
 }
 
 void responseInts(Parcel &p)
