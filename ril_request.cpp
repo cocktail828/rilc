@@ -30,6 +30,7 @@ void RILResponse::setCommandId(int cid)
 {
     mCommandId = cid;
 }
+<<<<<<< HEAD
 
 int RILResponse::getCommandId()
 {
@@ -41,6 +42,19 @@ void RILResponse::setError(int err)
     mError = err;
 }
 
+=======
+
+int RILResponse::getCommandId()
+{
+    return mCommandId;
+}
+
+void RILResponse::setError(int err)
+{
+    mError = err;
+}
+
+>>>>>>> 53c150debfc2e7c9f1cc22d4c68658d53bad1905
 int RILResponse::getError()
 {
     return mError;
