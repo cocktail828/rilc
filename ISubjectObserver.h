@@ -18,23 +18,25 @@ public:
     IObserver() {}
     virtual ~IObserver() {}
     virtual void update(Parcel &p) = 0;
-    virtual int get_requestid() = 0;
-    virtual int get_commandid() = 0;
+    virtual int getRequestId() = 0;
+    virtual int getCommandId() = 0;
 };
 
+// TODO, distinguish sync/async requests
 class ISubject
 {
 private:
     std::mutex mListLock;
     std::vector<IObserver *> mObservers;
+    const size_t mMaxSize = 10;
 
 public:
     void attach(IObserver *o)
     {
         std::lock_guard<std::mutex> _lk(mListLock);
         LOGD << "attach new observer: sn "
-             << o->get_requestid() << " cid "
-             << o->get_commandid() << ENDL;
+             << o->getRequestId() << " cid "
+             << o->getCommandId() << ENDL;
         mObservers.emplace_back(o);
     }
 
@@ -46,8 +48,8 @@ public:
             if ((*iter) == o)
             {
                 LOGD << "detach observer(" + std::to_string(mObservers.size()) + ") sn "
-                     << o->get_requestid()
-                     << " cid " << o->get_commandid() << ENDL;
+                     << o->getRequestId()
+                     << " cid " << o->getCommandId() << ENDL;
                 mObservers.erase(iter);
             }
             else
@@ -66,7 +68,7 @@ public:
         for (auto o : mObservers)
         {
             Parcel p;
-            LOGD << "removing observer: sn " << o->get_requestid() << ENDL;
+            LOGD << "removing observer: sn " << o->getRequestId() << ENDL;
             o->update(p);
         }
 
@@ -82,12 +84,18 @@ public:
         for (auto iter = mObservers.begin(); iter != mObservers.end();)
         {
             IObserver *o = *iter;
-            if (o->get_requestid() == rid)
+            if (o->getRequestId() == rid)
             {
                 o->update(p);
                 mObservers.erase(iter);
             }
         }
+    }
+
+    bool isListFull()
+    {
+        std::lock_guard<std::mutex> _lk(mListLock);
+        return (mObservers.size() >= mMaxSize);
     }
 };
 

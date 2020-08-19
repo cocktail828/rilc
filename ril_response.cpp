@@ -1,55 +1,47 @@
-#include "ril.h"
+#include "ril/ril.h"
 #include "ril_request.h"
 #include "ril_response.h"
 #include "logger.h"
 
-void RilResponse::setResponseID(int id)
-{
-    mResponseID = id;
-}
-
-void RilResponse::setResponseURCInfo(bool isurc)
-{
-    mIsURC = isurc;
-}
-
-void RilResponse::responseStrings(Parcel &p)
+void responseStrings(Parcel &p)
 {
     int num;
-    mRespType = RESP_STR_ARR;
-
     num = p.readInt();
     for (int i = 0; i < num; i++)
     {
         auto str = p.readString();
-        mRespVecString.emplace_back(str);
+        // resp.mRespVecString.emplace_back(str);
         p.freeString(str);
     }
 }
 
-void RilResponse::responseString(Parcel &p)
+void responseString(Parcel &p)
 {
     const char *response = p.readString();
-    mRespString = response;
+    std::string mRespString = response;
     p.freeString(response);
 
-    LOGD << "UNMARSHAL: " << mRespString << ENDL;
+    LOGI << "UNMARSHAL: " << mRespString << ENDL;
 }
 
-void RilResponse::responseInts(Parcel &p)
+void responseInts(Parcel &p)
 {
     int numInts;
     std::vector<int> response;
 
     numInts = p.readInt();
 
+    LOGI << "UNMARSHAL";
     for (int i = 0; i < numInts; i++)
     {
-        response.emplace_back(p.readInt());
+        int data = p.readInt();
+        response.emplace_back(data);
+        LOGI << data << " ";
     }
+    LOGI << ENDL;
 }
 
-void RilResponse::responseVoid(Parcel &p)
+void responseVoid(Parcel &p)
 {
 }
 
@@ -215,7 +207,7 @@ void RilResponse::responseVoid(Parcel &p)
 //     return s;
 // }
 
-void RilResponse::responseCallForward(Parcel &p)
+void responseCallForward(Parcel &p)
 {
     //     int numInfos;
     //     CallForwardInfo infos[];
@@ -237,7 +229,7 @@ void RilResponse::responseCallForward(Parcel &p)
     //     }
 }
 
-void RilResponse::responseSuppServiceNotification(Parcel &p)
+void responseSuppServiceNotification(Parcel &p)
 {
     //     SuppServiceNotification notification = new SuppServiceNotification();
 
@@ -248,13 +240,13 @@ void RilResponse::responseSuppServiceNotification(Parcel &p)
     //     notification.number = p.readString();
 }
 
-void RilResponse::responseCdmaSms(Parcel &p)
+void responseCdmaSms(Parcel &p)
 {
     //     SmsMessage sms;
     //     sms = SmsMessage.newFromParcel(p);
 }
 
-void RilResponse::responseRaw(Parcel &p)
+void responseRaw(Parcel &p)
 {
     // int num;
     // byte response[];
@@ -264,7 +256,7 @@ void RilResponse::responseRaw(Parcel &p)
     // return response;
 }
 
-void RilResponse::responseSMS(Parcel &p)
+void responseSMS(Parcel &p)
 {
     int messageRef, errorCode;
     std::string ackPDU;
@@ -276,11 +268,11 @@ void RilResponse::responseSMS(Parcel &p)
     // SmsResponse response = new SmsResponse(messageRef, ackPDU, errorCode);
 }
 
-void RilResponse::responseICC_IO(Parcel &p)
+void responseICC_IO(Parcel &p)
 {
     //     int sw1, sw2;
     //     byte data[] = null;
-    //     RilResponse *ret;
+    //     ret;
 
     //     sw1 = p.readInt();
     //     sw2 = p.readInt();
@@ -293,7 +285,7 @@ void RilResponse::responseICC_IO(Parcel &p)
     //     return new IccIoResult(sw1, sw2, s);
 }
 
-void RilResponse::responseIccCardStatus(Parcel &p)
+void responseIccCardStatus(Parcel &p)
 {
     //     IccCardApplication ca;
 
@@ -327,7 +319,7 @@ void RilResponse::responseIccCardStatus(Parcel &p)
     //     }
 }
 
-void RilResponse::responseCallList(Parcel &p)
+void responseCallList(Parcel &p)
 {
     //     int num;
     //     int voiceSettings;
@@ -443,7 +435,7 @@ void RilResponse::responseCallList(Parcel &p)
 //     return dataCall;
 // }
 
-void RilResponse::responseDataCallList(Parcel &p)
+void responseDataCallList(Parcel &p)
 {
     //     ArrayList<DataCallState> response;
 
@@ -460,7 +452,7 @@ void RilResponse::responseDataCallList(Parcel &p)
     //     return response;
 }
 
-void RilResponse::responseSetupDataCall(Parcel &p)
+void responseSetupDataCall(Parcel &p)
 {
     //     int ver = p.readInt();
     //     int num = p.readInt();
@@ -517,7 +509,7 @@ void RilResponse::responseSetupDataCall(Parcel &p)
     //     }
 }
 
-void RilResponse::responseOperatorInfos(Parcel &p)
+void responseOperatorInfos(Parcel &p)
 {
     //     String strings[] = (String[])responseStrings(p);
     //     ArrayList<OperatorInfo> ret;
@@ -541,7 +533,7 @@ void RilResponse::responseOperatorInfos(Parcel &p)
     //     }
 }
 
-void RilResponse::responseCellList(Parcel &p)
+void responseCellList(Parcel &p)
 {
     //     int num, rssi;
     //     String location;
@@ -597,7 +589,7 @@ void RilResponse::responseCellList(Parcel &p)
     //     }
 }
 
-void RilResponse::responseGetPreferredNetworkType(Parcel &p)
+void responseGetPreferredNetworkType(Parcel &p)
 {
     //     int[] response = (int[])responseInts(p);
 
@@ -611,7 +603,7 @@ void RilResponse::responseGetPreferredNetworkType(Parcel &p)
     //     return response;
 }
 
-void RilResponse::responseGmsBroadcastConfig(Parcel &p)
+void responseGmsBroadcastConfig(Parcel &p)
 {
     //     int num;
     //     ArrayList<SmsBroadcastConfigInfo> response;
@@ -634,7 +626,7 @@ void RilResponse::responseGmsBroadcastConfig(Parcel &p)
     //     }
 }
 
-void RilResponse::responseCdmaBroadcastConfig(Parcel &p)
+void responseCdmaBroadcastConfig(Parcel &p)
 {
     //     int numServiceCategories;
     //     int response[];
@@ -676,20 +668,20 @@ void RilResponse::responseCdmaBroadcastConfig(Parcel &p)
     //     }
 }
 
-void RilResponse::responseSignalStrength(Parcel &p)
+void responseSignalStrength(Parcel &p)
 {
     int numInts = 12;
-    mRespType = RESP_INT_ARR;
+    // mRespType = RESP_INT_ARR;
 
-    /* TODO: Add SignalStrength class to match RIL_SignalStrength */
-    for (int i = 0; i < numInts; i++)
-    {
-        mRespVecInt.emplace_back(p.readInt());
-        LOGI << mRespVecInt[i] << ENDL;
-    }
+    // /* TODO: Add SignalStrength class to match RIL_SignalStrength */
+    // for (int i = 0; i < numInts; i++)
+    // {
+    //     mRespVecInt.emplace_back(p.readInt());
+    //     LOGI << mRespVecInt[i] << ENDL;
+    // }
 }
 
-void RilResponse::responseCdmaInformationRecord(Parcel &p)
+void responseCdmaInformationRecord(Parcel &p)
 {
     //     int numberOfInfoRecs;
     //     ArrayList<CdmaInformationRecords> response;
@@ -708,7 +700,7 @@ void RilResponse::responseCdmaInformationRecord(Parcel &p)
     //     }
 }
 
-void RilResponse::responseCdmaCallWaiting(Parcel &p)
+void responseCdmaCallWaiting(Parcel &p)
 {
     //     CdmaCallWaitingNotification notification = new CdmaCallWaitingNotification();
 
@@ -724,7 +716,7 @@ void RilResponse::responseCdmaCallWaiting(Parcel &p)
     //     notification.numberPlan = p.readInt();
 }
 
-void RilResponse::responseCallRing(Parcel &p)
+void responseCallRing(Parcel &p)
 {
     //     char response[] = new char[4];
 
@@ -810,7 +802,7 @@ void RilResponse::responseCallRing(Parcel &p)
 //     }
 // }
 
-std::string RilResponse::responseToString(int respid)
+std::string responseToString(int respid)
 {
     switch (respid)
     {
@@ -878,12 +870,120 @@ std::string RilResponse::responseToString(int respid)
         return "UNSOL_RESEND_INCALL_MUTE";
     case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
         return "CDMA_SUBSCRIPTION_SOURCE_CHANGED";
-    case RIL_UNSOl_CDMA_PRL_CHANGED:
+    case RIL_UNSOL_CDMA_PRL_CHANGED:
         return "UNSOL_CDMA_PRL_CHANGED";
     case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE:
         return "UNSOL_EXIT_EMERGENCY_CALLBACK_MODE";
     case RIL_UNSOL_RIL_CONNECTED:
         return "UNSOL_RIL_CONNECTED";
+    case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED:
+        return "RIL_UNSOL_VOICE_RADIO_TECH_CHANGED";
+    case RIL_UNSOL_CELL_INFO_LIST:
+        return "RIL_UNSOL_CELL_INFO_LIST";
+    case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED:
+        return "RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED";
+    case RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED:
+        return "RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED";
+    case RIL_UNSOL_SRVCC_STATE_NOTIFY:
+        return "RIL_UNSOL_SRVCC_STATE_NOTIFY";
+    case RIL_UNSOL_HARDWARE_CONFIG_CHANGED:
+        return "RIL_UNSOL_HARDWARE_CONFIG_CHANGED";
+    case RIL_UNSOL_DC_RT_INFO_CHANGED:
+        return "RIL_UNSOL_DC_RT_INFO_CHANGED";
+    case RIL_UNSOL_RADIO_CAPABILITY:
+        return "RIL_UNSOL_RADIO_CAPABILITY";
+    case RIL_UNSOL_ON_SS:
+        return "RIL_UNSOL_ON_SS";
+    case RIL_UNSOL_STK_CC_ALPHA_NOTIFY:
+        return "RIL_UNSOL_STK_CC_ALPHA_NOTIFY";
+    case RIL_UNSOL_LCEDATA_RECV:
+        return "RIL_UNSOL_LCEDATA_RECV";
+
+    case RIL_UNSOL_RESPONSE_IMS_CALL_STATE_CHANGED:
+        return "RIL_UNSOL_RESPONSE_IMS_CALL_STATE_CHANGED";
+    case RIL_UNSOL_RESPONSE_VIDEO_QUALITY:
+        return "RIL_UNSOL_RESPONSE_VIDEO_QUALITY";
+    case RIL_UNSOL_RESPONSE_IMS_BEARER_ESTABLISTED:
+        return "RIL_UNSOL_RESPONSE_IMS_BEARER_ESTABLISTED";
+    case RIL_UNSOL_IMS_HANDOVER_REQUEST:
+        return "RIL_UNSOL_IMS_HANDOVER_REQUEST";
+    case RIL_UNSOL_IMS_HANDOVER_STATUS_CHANGE:
+        return "RIL_UNSOL_IMS_HANDOVER_STATUS_CHANGE";
+    case RIL_UNSOL_IMS_NETWORK_INFO_CHANGE:
+        return "RIL_UNSOL_IMS_NETWORK_INFO_CHANGE";
+    case RIL_UNSOL_IMS_REGISTER_ADDRESS_CHANGE:
+        return "RIL_UNSOL_IMS_REGISTER_ADDRESS_CHANGE";
+    case RIL_UNSOL_IMS_WIFI_PARAM:
+        return "RIL_UNSOL_IMS_WIFI_PARAM";
+    case RIL_UNSOL_IMS_NETWORK_STATE_CHANGED:
+        return "RIL_UNSOL_IMS_NETWORK_STATE_CHANGED";
+
+    case RIL_EXT_UNSOL_VIDEOPHONE_CODEC:
+        return "RIL_EXT_UNSOL_VIDEOPHONE_CODEC";
+    case RIL_EXT_UNSOL_VIDEOPHONE_DSCI:
+        return "RIL_EXT_UNSOL_VIDEOPHONE_DSCI";
+    case RIL_EXT_UNSOL_VIDEOPHONE_STRING:
+        return "RIL_EXT_UNSOL_VIDEOPHONE_STRING";
+    case RIL_EXT_UNSOL_VIDEOPHONE_REMOTE_MEDIA:
+        return "RIL_EXT_UNSOL_VIDEOPHONE_REMOTE_MEDIA";
+    case RIL_EXT_UNSOL_VIDEOPHONE_MM_RING:
+        return "RIL_EXT_UNSOL_VIDEOPHONE_MM_RING";
+    case RIL_EXT_UNSOL_VIDEOPHONE_RELEASING:
+        return "RIL_EXT_UNSOL_VIDEOPHONE_RELEASING";
+    case RIL_EXT_UNSOL_VIDEOPHONE_RECORD_VIDEO:
+        return "RIL_EXT_UNSOL_VIDEOPHONE_RECORD_VIDEO";
+    case RIL_EXT_UNSOL_VIDEOPHONE_MEDIA_START:
+        return "RIL_EXT_UNSOL_VIDEOPHONE_MEDIA_START";
+    case RIL_EXT_UNSOL_ECC_NETWORKLIST_CHANGED:
+        return "RIL_EXT_UNSOL_ECC_NETWORKLIST_CHANGED";
+    case RIL_EXT_UNSOL_RAU_SUCCESS:
+        return "RIL_EXT_UNSOL_RAU_SUCCESS";
+    case RIL_EXT_UNSOL_CLEAR_CODE_FALLBACK:
+        return "RIL_EXT_UNSOL_CLEAR_CODE_FALLBACK";
+    case RIL_EXT_UNSOL_RIL_CONNECTED:
+        return "RIL_EXT_UNSOL_RIL_CONNECTED";
+    case RIL_EXT_UNSOL_SIMLOCK_STATUS_CHANGED:
+        return "RIL_EXT_UNSOL_SIMLOCK_STATUS_CHANGED";
+    case RIL_EXT_UNSOL_SIMLOCK_SIM_EXPIRED:
+        return "RIL_EXT_UNSOL_SIMLOCK_SIM_EXPIRED";
+    case RIL_EXT_UNSOL_BAND_INFO:
+        return "RIL_EXT_UNSOL_BAND_INFO";
+    case RIL_EXT_UNSOL_SWITCH_PRIMARY_CARD:
+        return "RIL_EXT_UNSOL_SWITCH_PRIMARY_CARD";
+    case RIL_EXT_UNSOL_SIM_PS_REJECT:
+        return "RIL_EXT_UNSOL_SIM_PS_REJECT";
+    case RIL_EXT_UNSOL_SETUP_DATA_FOR_CP:
+        return "RIL_EXT_UNSOL_SETUP_DATA_FOR_CP";
+    case RIL_EXT_UNSOL_SIMMGR_SIM_STATUS_CHANGED:
+        return "RIL_EXT_UNSOL_SIMMGR_SIM_STATUS_CHANGED";
+    case RIL_EXT_UNSOL_RADIO_CAPABILITY_CHANGED:
+        return "RIL_EXT_UNSOL_RADIO_CAPABILITY_CHANGED";
+    case RIL_EXT_UNSOL_EARLY_MEDIA:
+        return "RIL_EXT_UNSOL_EARLY_MEDIA";
+    case RIL_EXT_UNSOL_ATROUTER_RSP:
+        return "RIL_EXT_UNSOL_ATROUTER_RSP";
+    case RIL_EXT_UNSOL_DATA_PDP_INFO:
+        return "RIL_EXT_UNSOL_DATA_PDP_INFO";
+
+#ifdef ORCA_FEATURE_5G
+    case RIL_EXT_UNSOL_PHYSICAL_CHANNEL_CONFIG:
+        return "RIL_EXT_UNSOL_PHYSICAL_CHANNEL_CONFIG";
+    case RIL_EXT_UNSOL_NETWORK_SCAN_RESULT:
+        return "RIL_EXT_UNSOL_NETWORK_SCAN_RESULT";
+    case RIL_EXT_UNSOL_SIGNAL_STRENGTH:
+        return "RIL_EXT_UNSOL_SIGNAL_STRENGTH";
+    case RIL_EXT_UNSOL_SIGNAL_CONN_STATUS:
+        return "RIL_EXT_UNSOL_SIGNAL_CONN_STATUS";
+    case RIL_EXT_UNSOL_PPP_RSP:
+        return "RIL_EXT_UNSOL_PPP_RSP";
+    case RIL_EXT_UNSOL_PPP_DATA_PDP_INFO:
+        return "RIL_EXT_UNSOL_PPP_DATA_PDP_INFO";
+#else
+    case RIL_EXT_UNSOL_PPP_RSP:
+        return "RIL_EXT_UNSOL_PPP_RSP";
+    case RIL_EXT_UNSOL_PPP_DATA_PDP_INFO:
+        return "RIL_EXT_UNSOL_PPP_DATA_PDP_INFO";
+#endif
     default:
         return "<unknown reponse>";
     }

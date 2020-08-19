@@ -318,7 +318,6 @@ void DeviceManager::processResponse(void *data, size_t len)
         LOGD << "process socilited message" << ENDL;
         /* find the observer and notice him */
         int rid = p.readInt();
-
         notify(rid, p);
     }
     else

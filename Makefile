@@ -1,5 +1,5 @@
 CXX := $(CROSS_COMPILE)g++
-CXXFLAGS += -Wall -g -fPIC -DNDEBUG -std=c++11 -I./include -I./parcel
+CXXFLAGS += -Wall -g -fPIC -DNDEBUG -std=c++11 -Iinclude -Iparcel -Iril
 
 objects := $(patsubst %.cpp, %.o, $(wildcard *.cpp))
 objects += $(patsubst %.cpp, %.o, $(wildcard parcel/*.cpp))

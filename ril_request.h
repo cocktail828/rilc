@@ -6,6 +6,7 @@
 #include "ISubjectObserver.h"
 #include "DeviceManager.h"
 #include "parcel/parcel.h"
+#include "ril_response.h"
 
 #ifndef __attribute_deprecated__
 #define __attribute_deprecated__ __attribute__((deprecated))
@@ -52,6 +53,16 @@ public:
 
     static bool blockSend(RilRequest *);
 
+    static void processUnsolicited(Parcel &);
+
+    static void processSolicited(RilRequest *rr, Parcel &);
+
+    /**
+     * the request must be an pointer
+     * or coredump or other unexpected result will be get
+     */
+    static bool nonblockSend(RilRequest *);
+
 public:
     explicit RilRequest();
 
@@ -62,14 +73,9 @@ public:
     /* When get some message from serial, this function will be called */
     void update(Parcel &);
 
-    int get_requestid();
+    int getRequestId();
 
-    int get_commandid();
-
-public:
-    static void processUnsolicited(Parcel &);
-
-    void processSolicited(Parcel &);
+    int getCommandId();
 
     /* RIL Requests */
 private:

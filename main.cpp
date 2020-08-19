@@ -26,14 +26,10 @@ int main(int argc, char **argv)
     }
 
     RILC_init(argv[1]);
-    LOGFI("main1");
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    RILC_requestIMEI();
+    RILC_TEST_REQ();
 
-    LOGFI("main2");
     RILC_uninit();
-    LOGFI("main3");
 
     return 0;
 }
