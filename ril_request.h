@@ -6,14 +6,40 @@
 #include "ISubjectObserver.h"
 #include "DeviceManager.h"
 #include "parcel/parcel.h"
-#include "ril_response.h"
+#include "ril/ril.h"
 
 #ifndef __attribute_deprecated__
 #define __attribute_deprecated__ __attribute__((deprecated))
 #endif
 
+class RILResponse
+{
+private:
+    /* error info */
+    int mError;
+
+    /* the command id */
+    int mCommandId;
+
+    /* the message is unsocilited */
+    bool mIsUrc;
+
+public:
+    RILResponse();
+    ~RILResponse();
+
+    void setURC(bool is_urc);
+    bool isURC();
+
+    void setCommandId(int cid);
+    int getCommandId();
+
+    void setError(int err);
+    int getError();
+};
+
 #define RIL_MAX_BUFSIZE (1024 * 8)
-class RilRequest final : public IObserver
+class RILRequest final : public IObserver
 {
 private:
     /* class variables */
@@ -41,7 +67,11 @@ private:
     Parcel mParcel;
 
 public:
-    static RilRequest &instance();
+    /* response info */
+    RILResponse mResponse;
+
+public:
+    static RILRequest &instance();
 
     static bool init(const char *device);
 
@@ -49,24 +79,23 @@ public:
 
     static bool isReady();
 
-    static void resetRequest();
-
-    static bool blockSend(RilRequest *);
+    static void resetGlobalRequest();
 
     static void processUnsolicited(Parcel &);
 
-    static void processSolicited(RilRequest *rr, Parcel &);
+    static void processSolicited(RILRequest *rr, Parcel &);
 
+    static bool blockSend(RILRequest *);
     /**
      * the request must be an pointer
      * or coredump or other unexpected result will be get
      */
-    static bool nonblockSend(RilRequest *);
+    static bool nonblockSend(RILRequest *);
 
 public:
-    explicit RilRequest();
+    explicit RILRequest();
 
-    ~RilRequest();
+    ~RILRequest();
 
     void obtain(int cid);
 
@@ -76,6 +105,8 @@ public:
     int getRequestId();
 
     int getCommandId();
+
+    void recycle();
 
     /* RIL Requests */
 private:
@@ -118,9 +149,9 @@ public:
 
     void getDataCallList();
 
-    // void dial(std::string address, int clirMode);
+    void dial(std::string address, int clirMode);
 
-    // void dial(std::string address, int clirMode, UUSInfo *uusInfo);
+    void dial(std::string address, int clirMode, RIL_UUS_Info *uusInfo);
 
     void getIMSI();
 
@@ -249,9 +280,9 @@ public:
 
     void resetRadio();
 
-    // void invokeOemRilRequestRaw(uint8_t *data);
+    // void invokeOemRILRequestRaw(uint8_t *data);
 
-    // void invokeOemRilRequestStrings(std::string[] strings);
+    // void invokeOemRILRequestStrings(std::string[] strings);
 
     void setBandMode(int bandMode);
 
@@ -264,8 +295,6 @@ public:
     void sendEnvelopeWithStatus(std::string contents);
 
     void handleCallSetupRequestFromSim(bool accept);
-
-    void setCurrentPreferredNetworkType();
 
     void setPreferredNetworkType(int networkType);
 
@@ -290,6 +319,6 @@ public:
     void setGsmBroadcastActivation(bool activate);
 };
 
-typedef RilRequest RILREQUEST;
+typedef RILRequest RILREQUEST;
 
 #endif //__RIL_REQUEST

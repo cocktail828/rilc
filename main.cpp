@@ -25,7 +25,10 @@ int main(int argc, char **argv)
         LOGD << "after switch user EGID\t= " << getegid() << ENDL;
     }
 
-    RILC_init(argv[1]);
+    if (argc > 1)
+        RILC_init(argv[1]);
+    else
+        RILC_init("/dev/ttyUSB4");
 
     RILC_TEST_REQ();
 

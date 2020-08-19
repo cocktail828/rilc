@@ -60,7 +60,7 @@ int RILC_uninit()
 
 int RILC_requestIMEI()
 {
-    RilRequest req;
+    RILRequest req;
     req.getIMEI();
 
     return 0;
@@ -68,131 +68,147 @@ int RILC_requestIMEI()
 
 int RILC_requestIMSI()
 {
-    RilRequest req;
+    RILRequest req;
     req.getIMSI();
 
     return 0;
 }
 
+#define ABORT_IF_ERROR(l)                                                      \
+    do                                                                         \
+    {                                                                          \
+        req.recycle();                                                         \
+        l;                                                                     \
+        if (req.mResponse.getError() || req.mResponse.getCommandId() == 0)     \
+        {                                                                      \
+            LOGE << "OOPS: request " << req.getCommandId() << " fail" << ENDL; \
+            abort();                                                           \
+        }                                                                      \
+    } while (0)
+
+void TEST_VOID_REQ()
+{
+    RILRequest req;
+    /**
+     * request without parameters
+     */
+
+    ABORT_IF_ERROR(req.getIccCardStatus());
+    ABORT_IF_ERROR(req.getCurrentCalls());
+    ABORT_IF_ERROR(req.getDataCallList());
+    ABORT_IF_ERROR(req.getIMEI());
+    ABORT_IF_ERROR(req.getIMEISV());
+    ABORT_IF_ERROR(req.getLastDataCallFailCause());
+    ABORT_IF_ERROR(req.getMute());
+    ABORT_IF_ERROR(req.getSignalStrength());
+    ABORT_IF_ERROR(req.getVoiceRegistrationState());
+    ABORT_IF_ERROR(req.getDataRegistrationState());
+    ABORT_IF_ERROR(req.getOperator());
+    ABORT_IF_ERROR(req.stopDtmf());
+    ABORT_IF_ERROR(req.getCLIR());
+    ABORT_IF_ERROR(req.setNetworkSelectionModeAutomatic());
+    ABORT_IF_ERROR(req.getNetworkSelectionMode());
+    ABORT_IF_ERROR(req.getAvailableNetworks());
+    ABORT_IF_ERROR(req.queryCLIP());
+    ABORT_IF_ERROR(req.getBasebandVersion());
+    ABORT_IF_ERROR(req.cancelPendingUssd());
+    ABORT_IF_ERROR(req.resetRadio());
+    ABORT_IF_ERROR(req.queryAvailableBandMode());
+    ABORT_IF_ERROR(req.getPreferredNetworkType());
+    ABORT_IF_ERROR(req.getNeighboringCids());
+    ABORT_IF_ERROR(req.getSmscAddress());
+    ABORT_IF_ERROR(req.reportStkServiceIsRunning());
+    ABORT_IF_ERROR(req.getGsmBroadcastConfig());
+    ABORT_IF_ERROR(req.getIMSI()); // --------- error
+}
+
 void RILC_TEST_REQ()
 {
-    RilRequest req;
+    // TEST_VOID_REQ();
 
-    req.getIccCardStatus();
-    // req.supplyIccPin(std::string pin);
-    // void supplyIccPinForApp(std::string pin, std::string aid);
-    // void supplyIccPuk(std::string puk, std::string newPin);
-    // void supplyIccPukForApp(std::string puk, std::string newPin, std::string aid);
-    // void supplyIccPin2(std::string pin);
-    // void supplyIccPin2ForApp(std::string pin, std::string aid);
-    // void supplyIccPuk2(std::string puk2, std::string newPin2);
-    // void supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid);
-    // void changeIccPin(std::string oldPin, std::string newPin);
-    // void changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid);
-    // void changeIccPin2(std::string oldPin2, std::string newPin2);
-    // void changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid);
-    // void changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd);
-    // void supplyNetworkDepersonalization(std::string netpin);
-    // void getCurrentCalls();
-
+    RILRequest req;
+    /**
+     * request with parameters
+     */
+    // req.supplyIccPin("1234");
+    // req.supplyIccPinForApp("1234", "2345");
+    // req.supplyIccPuk(std::string puk, std::string newPin);
+    // req.supplyIccPukForApp(std::string puk, std::string newPin, std::string aid);
+    // req.supplyIccPin2(std::string pin);
+    // req.supplyIccPin2ForApp(std::string pin, std::string aid);
+    // req.supplyIccPuk2(std::string puk2, std::string newPin2);
+    // req.supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid);
+    // req.changeIccPin(std::string oldPin, std::string newPin);
+    // req.changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid);
+    // req.changeIccPin2(std::string oldPin2, std::string newPin2);
+    // req.changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid);
+    // req.changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd);
+    // req.supplyNetworkDepersonalization("");
     // __attribute_deprecated__ void getPDPContextList();
-    // void getDataCallList();
-
-    // // void dial(std::string address, int clirMode);
-
-    // // void dial(std::string address, int clirMode, UUSInfo *uusInfo);
-    // void getIMSI();
-    // void getIMEI();
-    // void getIMEISV();
-    // void hangupConnection(int gsmIndex);
-    // void hangupWaitingOrBackground();
-    // void hangupForegroundResumeBackground();
-    // void switchWaitingOrHoldingAndActive();
-    // void conference();
-    // void setPreferredVoicePrivacy(bool enable);
-    // void getPreferredVoicePrivacy();
-    // void separateConnection(int gsmIndex);
-    // void acceptCall();
-    // void rejectCall();
-    // void explicitCallTransfer();
-    // void getLastCallFailCause();
+    ABORT_IF_ERROR(req.dial("15510525846", 0));
+    // // req.dial(std::string address, int clirMode, UUSInfo *uusInfo);
+    // req.hangupConnection(int gsmIndex);
+    // req.hangupWaitingOrBackground();
+    // req.hangupForegroundResumeBackground();
+    // req.switchWaitingOrHoldingAndActive();
+    // req.conference();
+    // req.setPreferredVoicePrivacy(bool enable);
+    // req.getPreferredVoicePrivacy();
+    // req.separateConnection(int gsmIndex);
+    // req.acceptCall();
+    // req.rejectCall();
+    // req.explicitCallTransfer();
+    // req.getLastCallFailCause();
 
     // __attribute_deprecated__ void getLastPdpFailCause();
-    // void getLastDataCallFailCause();
-    // void setMute(bool enableMute);
-    // void getMute();
-    // void getSignalStrength();
-    // void getVoiceRegistrationState();
-    // void getDataRegistrationState();
-    // void getOperator();
-    // void sendDtmf(char c);
-    // void startDtmf(char c);
-    // void stopDtmf();
-    // void sendBurstDtmf(std::string dtmfString, int on, int off);
-    // void sendSMS(std::string smscPDU, std::string pdu);
+    // req.setMute(bool enableMute);
+    // req.sendDtmf(char c);
+    // req.startDtmf(char c);
+    // req.sendBurstDtmf(std::string dtmfString, int on, int off);
+    // req.sendSMS(std::string smscPDU, std::string pdu);
 
-    // // void sendCdmaSms(uint8_t *pdu);
-    // void deleteSmsOnSim(int index);
-    // void deleteSmsOnRuim(int index);
-    // void writeSmsToSim(int status, std::string smsc, std::string pdu);
-    // void writeSmsToRuim(int status, std::string pdu);
-    // void setupDataCall(std::string radioTechnology, std::string profile, std::string apn,
+    // // req.sendCdmaSms(uint8_t *pdu);
+    // req.deleteSmsOnSim(int index);
+    // req.deleteSmsOnRuim(int index);
+    // req.writeSmsToSim(int status, std::string smsc, std::string pdu);
+    // req.writeSmsToRuim(int status, std::string pdu);
+    // req.setupDataCall(std::string radioTechnology, std::string profile, std::string apn,
     //                    std::string user, std::string password, std::string authType, std::string protocol);
-    // void deactivateDataCall(int cid, int reason);
-    // void setRadioPower(bool on);
-    // void setSuppServiceNotifications(bool enable);
-    // void acknowledgeLastIncomingGsmSms(bool success, int cause);
-    // void acknowledgeLastIncomingCdmaSms(bool success, int cause);
-    // void acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu);
-    // void iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
+    // req.deactivateDataCall(int cid, int reason);
+    // req.setRadioPower(bool on);
+    // req.setSuppServiceNotifications(bool enable);
+    // req.acknowledgeLastIncomingGsmSms(bool success, int cause);
+    // req.acknowledgeLastIncomingCdmaSms(bool success, int cause);
+    // req.acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu);
+    // req.iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
     //            std::string data, std::string pin2);
-    // void getCLIR();
-    // void setCLIR(int clirMode);
-    // void queryCallWaiting(int serviceClass);
-    // void setCallWaiting(bool enable, int serviceClass);
-    // void setNetworkSelectionModeAutomatic();
-    // void setNetworkSelectionModeManual(std::string operatorNumeric);
-    // void getNetworkSelectionMode();
-    // void getAvailableNetworks();
-    // void setCallForward(int action, int cfReason, int serviceClass,
+    // req.setCLIR(int clirMode);
+    // req.queryCallWaiting(int serviceClass);
+    // req.setCallWaiting(bool enable, int serviceClass);
+    // req.setNetworkSelectionModeManual(std::string operatorNumeric);
+    // req.setCallForward(int action, int cfReason, int serviceClass,
     //                     std::string number, int timeSeconds);
-    // void queryCallForwardStatus(int cfReason, int serviceClass,
+    // req.queryCallForwardStatus(int cfReason, int serviceClass,
     //                             std::string number);
-    // void queryCLIP();
-    // void getBasebandVersion();
-    // void queryFacilityLock(std::string facility, std::string password, int serviceClass);
-    // void queryFacilityLockForApp(std::string facility, std::string password, int serviceClass, std::string appId);
-    // void setFacilityLock(std::string facility, bool lockState, std::string password,
+    // req.queryFacilityLock(std::string facility, std::string password, int serviceClass);
+    // req.queryFacilityLockForApp(std::string facility, std::string password, int serviceClass, std::string appId);
+    // req.setFacilityLock(std::string facility, bool lockState, std::string password,
     //                      int serviceClass);
-    // void setFacilityLockForApp(std::string facility, bool lockState, std::string password,
+    // req.setFacilityLockForApp(std::string facility, bool lockState, std::string password,
     //                            int serviceClass, std::string appId);
-    // void sendUSSD(std::string ussdString);
-
-    // // inherited javadoc suffice
-    // void cancelPendingUssd();
-    // void resetRadio();
-
-    // // void invokeOemRilRequestRaw(uint8_t *data);
-
-    // // void invokeOemRilRequestStrings(std::string[] strings);
-    // void setBandMode(int bandMode);
-    // void queryAvailableBandMode();
-    // void sendTerminalResponse(std::string contents);
-    // void sendEnvelope(std::string contents);
-    // void sendEnvelopeWithStatus(std::string contents);
-    // void handleCallSetupRequestFromSim(bool accept);
-    // void setCurrentPreferredNetworkType();
-    // void setPreferredNetworkType(int networkType);
-    // void getPreferredNetworkType();
-    // void getNeighboringCids();
-    // void setLocationUpdates(bool enable);
-    // void getSmscAddress();
-    // void setSmscAddress(std::string address);
-    // void reportSmsMemoryStatus(bool available);
-    // void reportStkServiceIsRunning();
-    // void getGsmBroadcastConfig();
-
-    // // void setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config);
-    // void setGsmBroadcastActivation(bool activate);
+    // req.sendUSSD(std::string ussdString);
+    // // req.invokeOemRILRequestRaw(uint8_t *data);
+    // // req.invokeOemRILRequestStrings(std::string[] strings);
+    // req.setBandMode(int bandMode);
+    // req.sendTerminalResponse(std::string contents);
+    // req.sendEnvelope(std::string contents);
+    // req.sendEnvelopeWithStatus(std::string contents);
+    // req.handleCallSetupRequestFromSim(bool accept);
+    // req.setPreferredNetworkType(int networkType);
+    // req.setLocationUpdates(bool enable);
+    // req.setSmscAddress(std::string address);
+    // req.reportSmsMemoryStatus(bool available);
+    // req.setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config);
+    // req.setGsmBroadcastActivation(bool activate);
     return;
 }
