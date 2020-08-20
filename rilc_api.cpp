@@ -82,7 +82,7 @@ int RILC_requestIMSI()
         if (req.mResponse.getError() || req.mResponse.getCommandId() == 0)     \
         {                                                                      \
             LOGE << "OOPS: request " << req.getCommandId() << " fail" << ENDL; \
-            abort();                                                           \
+            /*abort();*/                                                           \
         }                                                                      \
     } while (0)
 
@@ -93,40 +93,42 @@ void TEST_VOID_REQ()
      * request without parameters
      */
 
-    ABORT_IF_ERROR(req.getIccCardStatus());
-    ABORT_IF_ERROR(req.getCurrentCalls());
-    ABORT_IF_ERROR(req.getDataCallList());
+    // ABORT_IF_ERROR(req.getIccCardStatus());
+    // ABORT_IF_ERROR(req.getCurrentCalls());
+    // ABORT_IF_ERROR(req.getDataCallList());
     ABORT_IF_ERROR(req.getIMEI());
-    ABORT_IF_ERROR(req.getIMEISV());
-    ABORT_IF_ERROR(req.getLastDataCallFailCause());
-    ABORT_IF_ERROR(req.getMute());
-    ABORT_IF_ERROR(req.getSignalStrength());
-    ABORT_IF_ERROR(req.getVoiceRegistrationState());
-    ABORT_IF_ERROR(req.getDataRegistrationState());
-    ABORT_IF_ERROR(req.getOperator());
-    ABORT_IF_ERROR(req.stopDtmf());
-    ABORT_IF_ERROR(req.getCLIR());
-    ABORT_IF_ERROR(req.setNetworkSelectionModeAutomatic());
-    ABORT_IF_ERROR(req.getNetworkSelectionMode());
-    ABORT_IF_ERROR(req.getAvailableNetworks());
-    ABORT_IF_ERROR(req.queryCLIP());
-    ABORT_IF_ERROR(req.getBasebandVersion());
-    ABORT_IF_ERROR(req.cancelPendingUssd());
-    ABORT_IF_ERROR(req.resetRadio());
-    ABORT_IF_ERROR(req.queryAvailableBandMode());
-    ABORT_IF_ERROR(req.getPreferredNetworkType());
-    ABORT_IF_ERROR(req.getNeighboringCids());
-    ABORT_IF_ERROR(req.getSmscAddress());
-    ABORT_IF_ERROR(req.reportStkServiceIsRunning());
-    ABORT_IF_ERROR(req.getGsmBroadcastConfig());
-    ABORT_IF_ERROR(req.getIMSI()); // --------- error
+    // ABORT_IF_ERROR(req.getIMEISV());
+    // ABORT_IF_ERROR(req.getLastDataCallFailCause());
+    // ABORT_IF_ERROR(req.getMute());
+    // ABORT_IF_ERROR(req.getSignalStrength());
+    // ABORT_IF_ERROR(req.getVoiceRegistrationState());
+    // ABORT_IF_ERROR(req.getDataRegistrationState());
+    // ABORT_IF_ERROR(req.getOperator());
+    // ABORT_IF_ERROR(req.stopDtmf());
+    // ABORT_IF_ERROR(req.getCLIR());
+    // ABORT_IF_ERROR(req.setNetworkSelectionModeAutomatic());
+    // ABORT_IF_ERROR(req.getNetworkSelectionMode());
+    // ABORT_IF_ERROR(req.getAvailableNetworks());
+    // ABORT_IF_ERROR(req.queryCLIP());
+    // ABORT_IF_ERROR(req.getBasebandVersion());
+    // ABORT_IF_ERROR(req.cancelPendingUssd());
+    // ABORT_IF_ERROR(req.resetRadio());
+    // ABORT_IF_ERROR(req.queryAvailableBandMode());
+    // ABORT_IF_ERROR(req.getPreferredNetworkType());
+    // ABORT_IF_ERROR(req.getNeighboringCids());
+    // ABORT_IF_ERROR(req.getSmscAddress());
+    // ABORT_IF_ERROR(req.reportStkServiceIsRunning());
+    // ABORT_IF_ERROR(req.getGsmBroadcastConfig());
+    // ABORT_IF_ERROR(req.getIMSI()); // --------- error
 }
 
 void RILC_TEST_REQ()
 {
-    // TEST_VOID_REQ();
 
     RILRequest req;
+
+    TEST_VOID_REQ();
+
     /**
      * request with parameters
      */
@@ -145,8 +147,8 @@ void RILC_TEST_REQ()
     // ABORT_IF_ERROR(req.changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd));
     // ABORT_IF_ERROR(req.supplyNetworkDepersonalization(""));
     // __attribute_deprecated__ void getPDPContextList();
-    ABORT_IF_ERROR(req.dial("15510525846", 0));
-    ABORT_IF_ERROR(req.dial("15510525846", 0, nullptr));
+    // ABORT_IF_ERROR(req.dial("15510525846", 0));
+    // ABORT_IF_ERROR(req.dial("15510525846", 0, nullptr));
     // ABORT_IF_ERROR(req.hangupConnection(int gsmIndex));
     // ABORT_IF_ERROR(req.hangupWaitingOrBackground());
     // ABORT_IF_ERROR(req.hangupForegroundResumeBackground());
@@ -192,7 +194,7 @@ void RILC_TEST_REQ()
     // ABORT_IF_ERROR(req.setFacilityLockForApp(std::string facility, bool lockState, std::string password, int serviceClass, std::string appId);
     // ABORT_IF_ERROR(req.sendUSSD(std::string ussdString));
     // ABORT_IF_ERROR(req.invokeOemRILRequestRaw(uint8_t *data));
-    // ABORT_IF_ERROR(req.invokeOemRILRequestStrings(std::string[] strings));
+    // ABORT_IF_ERROR(req.invokeOemRILRequestStrings({"AT+COPS?"}));
     // ABORT_IF_ERROR(req.setBandMode(int bandMode));
     // ABORT_IF_ERROR(req.sendTerminalResponse(std::string contents));
     // ABORT_IF_ERROR(req.sendEnvelope(std::string contents));

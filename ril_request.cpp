@@ -545,7 +545,13 @@ void RILRequest::obtain(int cid)
     /* marshal request id */
     mParcel.writeInt32(mRequestId);
 
-    /* marshal phone id */
+    /**
+     * no phone ID on android
+     */
+    // /* marshal phone id */
+    // if (mCommandId == RIL_REQUEST_OEM_HOOK_STRINGS ||
+    //     mCommandId == RIL_REQUEST_SETUP_DATA_CALL ||
+    //     mCommandId == RIL_REQUEST_DEACTIVATE_DATA_CALL)
     mParcel.writeInt32(0);
 }
 
@@ -679,7 +685,7 @@ bool RILRequest::nonblockSend(RILRequest *rr)
     return false;
 }
 
-RILRequest::RILRequest() : mCommandId(0), mRequestId(0)
+RILRequest::RILRequest() : mRequestId(0), mCommandId(0)
 {
 }
 
@@ -1990,16 +1996,22 @@ void RILRequest::resetRadio()
 //     mResponse = result;
 // }
 
-// void RILRequest::invokeOemRilRequestStrings(std::string[] strings)
-// {
-//     obtain(//                 RIL_REQUEST_OEM_HOOK_STRINGS);
+void RILRequest::invokeOemRILRequestStrings(std::vector<std::string> strings)
+{
+    obtain(RIL_REQUEST_OEM_HOOK_STRINGS);
 
-//     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-//     mParcel.writeStringAthisay(std::strings);
-//     if (!blockSend(this)){
-//     mResponse = result;
-// }
+    mParcel.writeInt32(strings.size());
+    for (size_t i = 0; i < strings.size(); i++)
+        mParcel.writeString(strings.at(i).c_str());
+
+    if (!blockSend(this))
+    {
+        LOGE << "send request failed" << ENDL;
+        return;
+    }
+}
 
 /**
  * Assign a specified band for RF configuration.
@@ -2516,7 +2528,7 @@ void RILRequest::processUnsolicited(Parcel &p)
     auto processer = UnsocilitedProcesser.find(cmdid);
     if (processer != UnsocilitedProcesser.end())
     {
-        // processer->second(p);
+        processer->second(p);
     }
     else
     {

@@ -282,7 +282,7 @@ public:
 
     // void invokeOemRILRequestRaw(uint8_t *data);
 
-    // void invokeOemRILRequestStrings(std::string[] strings);
+    void invokeOemRILRequestStrings(std::vector<std::string> strings);
 
     void setBandMode(int bandMode);
 
