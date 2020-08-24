@@ -312,6 +312,7 @@ void responseRaw(Parcel &p, RILResponse *resp)
     response_len = p.readInt32();
     response = p.readInt32();
 
+    (void)response_len;
     if (resp)
     {
         resp->type = TYPE_INT;
@@ -485,6 +486,7 @@ void responseDataCallList(Parcel &p, RILResponse *resp)
         return;
     }
 
+    (void)dontCare;
     for (int i = 0; i < num; i++)
     {
         response[i].status = p.readInt32();

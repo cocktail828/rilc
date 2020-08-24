@@ -18,6 +18,8 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <string.h>
+
 #include "jstring.h"
 
 /* See http://www.unicode.org/reports/tr22/ for discussion
@@ -178,7 +180,7 @@ extern char16_t *strdup8to16(const char *s, size_t *out_len)
     char16_t *ret;
     size_t len;
 
-    if (s == NULL)
+    if (s == NULL || strlen(s) == 0)
         return NULL;
 
     len = strlen8to16(s);

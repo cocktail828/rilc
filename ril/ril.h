@@ -104,10 +104,10 @@ enum RILConstants
     SETUP_DATA_TECH_CDMA = 0,
     SETUP_DATA_TECH_GSM = 1,
 
-    SETUP_DATA_AUTH_NONE = 0,
-    SETUP_DATA_AUTH_PAP = 1,
-    SETUP_DATA_AUTH_CHAP = 2,
-    SETUP_DATA_AUTH_PAP_CHAP = 3,
+    // SETUP_DATA_AUTH_NONE = 0,
+    // SETUP_DATA_AUTH_PAP = 1,
+    // SETUP_DATA_AUTH_CHAP = 2,
+    // SETUP_DATA_AUTH_PAP_CHAP = 3,
 
     /* Deactivate data call reasons */
     DEACTIVATE_REASON_NONE = 0,

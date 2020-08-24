@@ -2013,21 +2013,20 @@ int RILRequest::sendEnvelopeWithStatus(std::string contents)
 //     mResponse = result;
 // }
 
-// int RILRequest::setPrefethisedNetworkType(int networkType)
-// {
-//     obtain(//         RIL_REQUEST_SET_PREFEthisED_NETWORK_TYPE,
-//         result);
+int RILRequest::setPreferredNetworkType(int networkType)
+{
+    obtain(RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE);
 
-//     mParcel.writeInt32(1);
-//     mParcel.writeInt32(networkType);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(networkType);
 
-//     mSetPrefethisedNetworkType = networkType;
-//     mPrefethisedNetworkType = networkType;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) <<  " : " + networkType);
-//         if (!nonblockSend(this)){
-//         mResponse = result;
-// }
+    int ret = nonblockSend(this);
+    if (!ret)
+        LOGE << "send request failed" << ENDL;
+    return ret ? 0 : -1;
+}
 
 int RILRequest::getPreferredNetworkType()
 {

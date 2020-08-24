@@ -494,6 +494,8 @@ int RILC_uninit();
 // RILC_ + RILRequest method
 int RILC_getIMEI(RILResponse *resp);
 
+int RILC_getSignalStrength(RILResponse *resp);
+
 int RILC_getIMSI(RILResponse *resp);
 
 int RILC_getVoiceRegistrationState(RILResponse *resp);
@@ -503,5 +505,12 @@ int RILC_getDataRegistrationState(RILResponse *resp);
 int RILC_getOperator(RILResponse *resp);
 
 int RILC_getNeighboringCids(RILResponse *resp);
+
+int RILC_setupDataCall(RILResponse *resp, RadioTech radioTechnology, const char *profile, const char *apn,
+                       const char *user, const char *password, RadioAuth authType, RadioProtocol protocol);
+
+int RILC_setPreferredNetworkType(RILResponse *resp, RadioTech networktype);
+
+int RILC_queryAvailableBandMode(RILResponse *resp);
 
 #endif //__RILC

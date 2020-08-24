@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "rilc_api.h"
+#include "rilc_interface.h"
 #include "logger.h"
 
 std::mutex mutex;
@@ -65,14 +66,14 @@ void dump_response(RILResponse *resp)
     }
 }
 
-#define RILC_DO_COMMAND(RILC_func)                                                  \
+#define RILC_DO_COMMAND(RILC_func, args...)                                         \
     do                                                                              \
     {                                                                               \
         RILResponse resp;                                                           \
         memset(&resp, 0, sizeof(RILResponse));                                      \
         resp.notify = socilited_notify;                                             \
         std::unique_lock<std::mutex> _lk(mutex);                                    \
-        RILC_func(&resp);                                                           \
+        RILC_func(&resp, ##args);                                                   \
         if (cond.wait_for(_lk, std::chrono::seconds(5)) == std::cv_status::timeout) \
             LOGE << "TIMEOUT" << ENDL;                                              \
         else                                                                        \
@@ -84,8 +85,15 @@ void dump_response(RILResponse *resp)
 
 int main(int argc, char **argv)
 {
-    Logger::Init("RILC", Severity::INFO, false);
+    /**
+     * set log level Severity::INFO
+     * for more detail set Severity::DEBUG
+     */
+    Logger::Init("RILC", Severity::DEBUG, false);
 
+    /** test on Android
+     * Android only allow user radio connect socket '/dev/socket/rild'
+     */
     if (argc >= 3)
     {
         setgid(atoi(argv[2]));
@@ -97,26 +105,34 @@ int main(int argc, char **argv)
         LOGD << "after switch user EGID\t= " << getegid() << ENDL;
     }
 
+    /** test on Linux with RG500U
+     * Android only allow user radio connect socket '/dev/socket/rild'
+     */
     if (argc > 1)
         RILC_init(argv[1]);
     else
         RILC_init("/dev/ttyUSB4");
 
-    // RILC_resister_unsocilited();
-
-    /* get imei */
     RILC_DO_COMMAND(RILC_getIMEI);
 
-    /* get imsi */
-    RILC_DO_COMMAND(RILC_getIMSI);
+    // RILC_DO_COMMAND(RILC_getIMSI);
 
-    RILC_DO_COMMAND(RILC_getVoiceRegistrationState);
+    // RILC_DO_COMMAND(RILC_getVoiceRegistrationState);
 
-    RILC_DO_COMMAND(RILC_getDataRegistrationState);
+    // RILC_DO_COMMAND(RILC_getDataRegistrationState);
 
-    RILC_DO_COMMAND(RILC_getOperator);
+    // RILC_DO_COMMAND(RILC_getOperator);
 
-    RILC_DO_COMMAND(RILC_getNeighboringCids);
+    // RILC_DO_COMMAND(RILC_getNeighboringCids);
+
+    // RILC_DO_COMMAND(RILC_getSignalStrength);
+
+    // RILC_DO_COMMAND(RILC_setPreferredNetworkType, RADIO_TECHNOLOGY_LTE);
+
+    RILC_DO_COMMAND(RILC_setupDataCall, RADIO_TECHNOLOGY_LTE, "0", "3gnet",
+                    "user", "1234", SETUP_DATA_AUTH_NONE, PROTOCOL_IPV4);
+
+    // RILC_DO_COMMAND(RILC_queryAvailableBandMode);
 
     RILC_uninit();
 
