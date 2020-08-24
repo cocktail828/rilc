@@ -17,6 +17,7 @@
 #include "ril_request.h"
 #include "parcel/parcel.h"
 
+#define MAX_TRY 5
 void pollingRead(DeviceManager *args)
 {
     int epfd = epoll_create(10);
@@ -74,14 +75,37 @@ void pollingRead(DeviceManager *args)
                     {
                         length = be32toh(length);
                         LOGD << "response length = " << length << ENDL;
+
                         if (length > MAX_RILD_DATA_SIZE)
                         {
                             LOGE << "error, message lenth too long" << ENDL;
                             length = MAX_RILD_DATA_SIZE - 1;
                         }
+
                         // read message body
-                        if (args->recvAsync(recvBuff, length, &olen) && olen > 0)
-                            args->processResponse(recvBuff, olen);
+                        int expect_len = length;
+                        int read_len = 0;
+                        int try_time = 0;
+                        const int max_try = 10;
+                        do
+                        {
+                            if (args->recvAsync((uint8_t *)recvBuff + read_len, length, &olen) && olen > 0)
+                            {
+                                expect_len -= olen;
+                                read_len += olen;
+                            }
+                            else
+                            {
+                                std::this_thread::sleep_for(std::chrono::microseconds(3000));
+                                try_time++;
+                            }
+
+                            if (expect_len == 0 || try_time == max_try)
+                                break;
+                        } while (1);
+
+                        if (expect_len == 0)
+                            args->processResponse(recvBuff, length);
                         else
                             LOGE << "read response data failed" << ENDL;
                     }
@@ -303,7 +327,7 @@ void DeviceManager::processResponse(void *data, size_t len)
     if (len == 0)
     {
         LOGD << "polling thread may quit" << ENDL;
-        detachAll();
+        mQuitFlag = true;
         return;
     }
 

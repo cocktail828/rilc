@@ -6,37 +6,12 @@
 #include "ISubjectObserver.h"
 #include "DeviceManager.h"
 #include "parcel/parcel.h"
+#include "rilc_interface.h"
 #include "ril/ril.h"
 
 #ifndef __attribute_deprecated__
 #define __attribute_deprecated__ __attribute__((deprecated))
 #endif
-
-class RILResponse
-{
-private:
-    /* error info */
-    int mError;
-
-    /* the command id */
-    int mCommandId;
-
-    /* the message is unsocilited */
-    bool mIsUrc;
-
-public:
-    RILResponse();
-    ~RILResponse();
-
-    void setURC(bool is_urc);
-    bool isURC();
-
-    void setCommandId(int cid);
-    int getCommandId();
-
-    void setError(int err);
-    int getError();
-};
 
 #define RIL_MAX_BUFSIZE (1024 * 8)
 class RILRequest final : public IObserver
@@ -46,6 +21,7 @@ private:
     static DeviceManager *mDeviceMgr;
     static int mGlobalRequestId;
     static bool mReady;
+    static RILResponse mUnsocilitedResponse;
 
 public:
     static std::mutex mGlobalLock;
@@ -68,7 +44,7 @@ private:
 
 public:
     /* response info */
-    RILResponse mResponse;
+    RILResponse *mResponse;
 
 public:
     static RILRequest &instance();
@@ -94,6 +70,7 @@ public:
 
 public:
     explicit RILRequest();
+    explicit RILRequest(RILResponse *resp);
 
     ~RILRequest();
 
@@ -113,210 +90,210 @@ private:
     int translateStatus(int status);
 
 public:
-    void getIccCardStatus();
+    int getIccCardStatus();
 
-    void supplyIccPin(std::string pin);
+    int supplyIccPin(std::string pin);
 
-    void supplyIccPinForApp(std::string pin, std::string aid);
+    int supplyIccPinForApp(std::string pin, std::string aid);
 
-    void supplyIccPuk(std::string puk, std::string newPin);
+    int supplyIccPuk(std::string puk, std::string newPin);
 
-    void supplyIccPukForApp(std::string puk, std::string newPin, std::string aid);
+    int supplyIccPukForApp(std::string puk, std::string newPin, std::string aid);
 
-    void supplyIccPin2(std::string pin);
+    int supplyIccPin2(std::string pin);
 
-    void supplyIccPin2ForApp(std::string pin, std::string aid);
+    int supplyIccPin2ForApp(std::string pin, std::string aid);
 
-    void supplyIccPuk2(std::string puk2, std::string newPin2);
+    int supplyIccPuk2(std::string puk2, std::string newPin2);
 
-    void supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid);
+    int supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid);
 
-    void changeIccPin(std::string oldPin, std::string newPin);
+    int changeIccPin(std::string oldPin, std::string newPin);
 
-    void changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid);
+    int changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid);
 
-    void changeIccPin2(std::string oldPin2, std::string newPin2);
+    int changeIccPin2(std::string oldPin2, std::string newPin2);
 
-    void changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid);
+    int changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid);
 
-    void changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd);
+    int changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd);
 
-    void supplyNetworkDepersonalization(std::string netpin);
+    int supplyNetworkDepersonalization(std::string netpin);
 
-    void getCurrentCalls();
+    int getCurrentCalls();
 
-    __attribute_deprecated__ void getPDPContextList();
+    __attribute_deprecated__ int getPDPContextList();
 
-    void getDataCallList();
+    int getDataCallList();
 
-    void dial(std::string address, int clirMode);
+    int dial(std::string address, int clirMode);
 
-    void dial(std::string address, int clirMode, RIL_UUS_Info *uusInfo);
+    int dial(std::string address, int clirMode, RIL_UUS_Info *uusInfo);
 
-    void getIMSI();
+    int getIMSI();
 
-    void getIMEI();
+    int getIMEI();
 
-    void getIMEISV();
+    int getIMEISV();
 
-    void hangupConnection(int gsmIndex);
+    int hangupConnection(int gsmIndex);
 
-    void hangupWaitingOrBackground();
+    int hangupWaitingOrBackground();
 
-    void hangupForegroundResumeBackground();
+    int hangupForegroundResumeBackground();
 
-    void switchWaitingOrHoldingAndActive();
+    int switchWaitingOrHoldingAndActive();
 
-    void conference();
+    int conference();
 
-    void setPreferredVoicePrivacy(bool enable);
+    int setPreferredVoicePrivacy(bool enable);
 
-    void getPreferredVoicePrivacy();
+    int getPreferredVoicePrivacy();
 
-    void separateConnection(int gsmIndex);
+    int separateConnection(int gsmIndex);
 
-    void acceptCall();
+    int acceptCall();
 
-    void rejectCall();
+    int rejectCall();
 
-    void explicitCallTransfer();
+    int explicitCallTransfer();
 
-    void getLastCallFailCause();
+    int getLastCallFailCause();
 
-    __attribute_deprecated__ void getLastPdpFailCause();
+    __attribute_deprecated__ int getLastPdpFailCause();
 
-    void getLastDataCallFailCause();
+    int getLastDataCallFailCause();
 
-    void setMute(bool enableMute);
+    int setMute(bool enableMute);
 
-    void getMute();
+    int getMute();
 
-    void getSignalStrength();
+    int getSignalStrength();
 
-    void getVoiceRegistrationState();
+    int getVoiceRegistrationState();
 
-    void getDataRegistrationState();
+    int getDataRegistrationState();
 
-    void getOperator();
+    int getOperator();
 
-    void sendDtmf(char c);
+    int sendDtmf(char c);
 
-    void startDtmf(char c);
+    int startDtmf(char c);
 
-    void stopDtmf();
+    int stopDtmf();
 
-    void sendBurstDtmf(std::string dtmfString, int on, int off);
+    int sendBurstDtmf(std::string dtmfString, int on, int off);
 
-    void sendSMS(std::string smscPDU, std::string pdu);
+    int sendSMS(std::string smscPDU, std::string pdu);
 
-    // void sendCdmaSms(uint8_t *pdu);
+    // int sendCdmaSms(uint8_t *pdu);
 
-    void deleteSmsOnSim(int index);
+    int deleteSmsOnSim(int index);
 
-    void deleteSmsOnRuim(int index);
+    int deleteSmsOnRuim(int index);
 
-    void writeSmsToSim(int status, std::string smsc, std::string pdu);
+    int writeSmsToSim(int status, std::string smsc, std::string pdu);
 
-    void writeSmsToRuim(int status, std::string pdu);
+    int writeSmsToRuim(int status, std::string pdu);
 
-    void setupDataCall(std::string radioTechnology, std::string profile, std::string apn,
-                       std::string user, std::string password, std::string authType, std::string protocol);
+    int setupDataCall(std::string radioTechnology, std::string profile, std::string apn,
+                      std::string user, std::string password, std::string authType, std::string protocol);
 
-    void deactivateDataCall(int cid, int reason);
+    int deactivateDataCall(int cid, int reason);
 
-    void setRadioPower(bool on);
+    int setRadioPower(bool on);
 
-    void setSuppServiceNotifications(bool enable);
+    int setSuppServiceNotifications(bool enable);
 
-    void acknowledgeLastIncomingGsmSms(bool success, int cause);
+    int acknowledgeLastIncomingGsmSms(bool success, int cause);
 
-    void acknowledgeLastIncomingCdmaSms(bool success, int cause);
+    int acknowledgeLastIncomingCdmaSms(bool success, int cause);
 
-    void acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu);
+    int acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu);
 
-    void iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
-               std::string data, std::string pin2);
+    int iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
+              std::string data, std::string pin2);
 
-    void getCLIR();
+    int getCLIR();
 
-    void setCLIR(int clirMode);
+    int setCLIR(int clirMode);
 
-    void queryCallWaiting(int serviceClass);
+    int queryCallWaiting(int serviceClass);
 
-    void setCallWaiting(bool enable, int serviceClass);
+    int setCallWaiting(bool enable, int serviceClass);
 
-    void setNetworkSelectionModeAutomatic();
+    int setNetworkSelectionModeAutomatic();
 
-    void setNetworkSelectionModeManual(std::string operatorNumeric);
+    int setNetworkSelectionModeManual(std::string operatorNumeric);
 
-    void getNetworkSelectionMode();
+    int getNetworkSelectionMode();
 
-    void getAvailableNetworks();
+    int getAvailableNetworks();
 
-    void setCallForward(int action, int cfReason, int serviceClass,
-                        std::string number, int timeSeconds);
+    int setCallForward(int action, int cfReason, int serviceClass,
+                       std::string number, int timeSeconds);
 
-    void queryCallForwardStatus(int cfReason, int serviceClass,
-                                std::string number);
+    int queryCallForwardStatus(int cfReason, int serviceClass,
+                               std::string number);
 
-    void queryCLIP();
+    int queryCLIP();
 
-    void getBasebandVersion();
+    int getBasebandVersion();
 
-    void queryFacilityLock(std::string facility, std::string password, int serviceClass);
+    int queryFacilityLock(std::string facility, std::string password, int serviceClass);
 
-    void queryFacilityLockForApp(std::string facility, std::string password, int serviceClass, std::string appId);
+    int queryFacilityLockForApp(std::string facility, std::string password, int serviceClass, std::string appId);
 
-    void setFacilityLock(std::string facility, bool lockState, std::string password,
-                         int serviceClass);
+    int setFacilityLock(std::string facility, bool lockState, std::string password,
+                        int serviceClass);
 
-    void setFacilityLockForApp(std::string facility, bool lockState, std::string password,
-                               int serviceClass, std::string appId);
+    int setFacilityLockForApp(std::string facility, bool lockState, std::string password,
+                              int serviceClass, std::string appId);
 
-    void sendUSSD(std::string ussdString);
+    int sendUSSD(std::string ussdString);
 
     // inherited javadoc suffices
-    void cancelPendingUssd();
+    int cancelPendingUssd();
 
-    void resetRadio();
+    int resetRadio();
 
-    // void invokeOemRILRequestRaw(uint8_t *data);
+    // int invokeOemRILRequestRaw(uint8_t *data);
 
-    void invokeOemRILRequestStrings(std::vector<std::string> strings);
+    int invokeOemRILRequestStrings(std::vector<std::string> strings);
 
-    void setBandMode(int bandMode);
+    int setBandMode(int bandMode);
 
-    void queryAvailableBandMode();
+    int queryAvailableBandMode();
 
-    void sendTerminalResponse(std::string contents);
+    int sendTerminalResponse(std::string contents);
 
-    void sendEnvelope(std::string contents);
+    int sendEnvelope(std::string contents);
 
-    void sendEnvelopeWithStatus(std::string contents);
+    int sendEnvelopeWithStatus(std::string contents);
 
-    void handleCallSetupRequestFromSim(bool accept);
+    int handleCallSetupRequestFromSim(bool accept);
 
-    void setPreferredNetworkType(int networkType);
+    int setPreferredNetworkType(int networkType);
 
-    void getPreferredNetworkType();
+    int getPreferredNetworkType();
 
-    void getNeighboringCids();
+    int getNeighboringCids();
 
-    void setLocationUpdates(bool enable);
+    int setLocationUpdates(bool enable);
 
-    void getSmscAddress();
+    int getSmscAddress();
 
-    void setSmscAddress(std::string address);
+    int setSmscAddress(std::string address);
 
-    void reportSmsMemoryStatus(bool available);
+    int reportSmsMemoryStatus(bool available);
 
-    void reportStkServiceIsRunning();
+    int reportStkServiceIsRunning();
 
-    void getGsmBroadcastConfig();
+    int getGsmBroadcastConfig();
 
-    // void setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config);
+    // int setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config);
 
-    void setGsmBroadcastActivation(bool activate);
+    int setGsmBroadcastActivation(bool activate);
 };
 
 typedef RILRequest RILREQUEST;

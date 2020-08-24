@@ -9,44 +9,6 @@
 #include "ril/ril.h"
 
 /**
- * RIL Response
- */
-
-RILResponse::RILResponse() : mError(0), mCommandId(0), mIsUrc(false) {}
-
-RILResponse::~RILResponse() {}
-
-void RILResponse::setURC(bool is_urc)
-{
-    mIsUrc = is_urc;
-}
-
-bool RILResponse::isURC()
-{
-    return mIsUrc;
-}
-
-void RILResponse::setCommandId(int cid)
-{
-    mCommandId = cid;
-}
-
-int RILResponse::getCommandId()
-{
-    return mCommandId;
-}
-
-void RILResponse::setError(int err)
-{
-    mError = err;
-}
-
-int RILResponse::getError()
-{
-    return mError;
-}
-
-/**
  * RIL Request
  */
 DeviceManager *RILRequest::mDeviceMgr = nullptr;
@@ -54,6 +16,7 @@ int RILRequest::mGlobalRequestId = 0;
 ;
 bool RILRequest::mReady = false;
 std::mutex RILRequest::mGlobalLock;
+RILResponse RILRequest::mUnsocilitedResponse;
 
 static std::string requestidToString(int id)
 {
@@ -531,6 +494,28 @@ static std::string commandidToString(int cid)
     }
 }
 
+RILRequest::RILRequest(RILResponse *resp)
+    : IObserver(),
+      mRequestId(0),
+      mCommandId(0),
+      mResponse(resp) {}
+
+RILRequest::RILRequest()
+    : IObserver(),
+      mRequestId(0),
+      mCommandId(0),
+      mResponse(nullptr) {}
+
+RILRequest::~RILRequest()
+{
+    /**
+     * sometimes user may new an instance to make a request
+     * we should make sure, the instance is detached when destroy
+     */
+    if (mDeviceMgr && mAttachState)
+        mDeviceMgr->detach(this);
+}
+
 /**
  * use dto build an new request will only 'command id'
  */
@@ -685,20 +670,6 @@ bool RILRequest::nonblockSend(RILRequest *rr)
     return false;
 }
 
-RILRequest::RILRequest() : mRequestId(0), mCommandId(0)
-{
-}
-
-RILRequest::~RILRequest()
-{
-    /**
-     * sometimes user may new an instance to make a request
-     * we should make sure, the instance is detached when destroy
-     */
-    if (mDeviceMgr)
-        mDeviceMgr->detach(this);
-}
-
 /**
  * When get some message from DeviceManager, this function will be called
  */
@@ -714,7 +685,6 @@ void RILRequest::update(Parcel &p)
         processSolicited(this, p);
     }
 
-    mRequestCond.notify_one();
     return;
 }
 
@@ -732,245 +702,232 @@ void RILRequest::recycle()
 {
     mCommandId = 0;
     mRequestId = 0;
-    mResponse.setCommandId(0);
-    mResponse.setError(0);
-    mResponse.setURC(0);
     mParcel.recycle();
 }
 
-void RILRequest::getIccCardStatus()
+int RILRequest::getIccCardStatus()
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     obtain(RIL_REQUEST_GET_SIM_STATUS);
 
-    LOGD << requestidToString(getRequestId()) << "> " << commandidToString(getCommandId()) << ENDL;
-    if (!blockSend(this))
-    {
+    LOGI << requestidToString(getRequestId()) << "> " << commandidToString(getCommandId()) << ENDL;
+
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::supplyIccPin(std::string pin)
+int RILRequest::supplyIccPin(std::string pin)
 {
-    supplyIccPinForApp(pin, "");
+    return supplyIccPinForApp(pin, "");
 }
 
-void RILRequest::supplyIccPinForApp(std::string pin, std::string aid)
+int RILRequest::supplyIccPinForApp(std::string pin, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     obtain(RIL_REQUEST_ENTER_SIM_PIN);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeInt32(2);
     mParcel.writeString(pin.c_str());
     mParcel.writeString(aid.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::supplyIccPuk(std::string puk, std::string newPin)
+int RILRequest::supplyIccPuk(std::string puk, std::string newPin)
 {
-    supplyIccPukForApp(puk, newPin, "");
+    return supplyIccPukForApp(puk, newPin, "");
 }
 
-void RILRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::string aid)
+int RILRequest::supplyIccPukForApp(std::string puk, std::string newPin, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     obtain(RIL_REQUEST_ENTER_SIM_PUK);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeInt32(3);
     mParcel.writeString(puk.c_str());
     mParcel.writeString(newPin.c_str());
     mParcel.writeString(aid.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::supplyIccPin2(std::string pin)
+int RILRequest::supplyIccPin2(std::string pin)
 {
-    supplyIccPin2ForApp(pin, "");
+    return supplyIccPin2ForApp(pin, "");
 }
 
-void RILRequest::supplyIccPin2ForApp(std::string pin, std::string aid)
+int RILRequest::supplyIccPin2ForApp(std::string pin, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     obtain(RIL_REQUEST_ENTER_SIM_PIN2);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeInt32(2);
     mParcel.writeString(pin.c_str());
     mParcel.writeString(aid.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::supplyIccPuk2(std::string puk2, std::string newPin2)
+int RILRequest::supplyIccPuk2(std::string puk2, std::string newPin2)
 {
-    supplyIccPuk2ForApp(puk2, newPin2, "");
+    return supplyIccPuk2ForApp(puk2, newPin2, "");
 }
 
-void RILRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid)
+int RILRequest::supplyIccPuk2ForApp(std::string puk, std::string newPin2, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     obtain(RIL_REQUEST_ENTER_SIM_PUK2);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeInt32(3);
     mParcel.writeString(puk.c_str());
     mParcel.writeString(newPin2.c_str());
     mParcel.writeString(aid.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::changeIccPin(std::string oldPin, std::string newPin)
+int RILRequest::changeIccPin(std::string oldPin, std::string newPin)
 {
-    changeIccPinForApp(oldPin, newPin, "");
+    return changeIccPinForApp(oldPin, newPin, "");
 }
 
-void RILRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid)
+int RILRequest::changeIccPinForApp(std::string oldPin, std::string newPin, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     obtain(RIL_REQUEST_CHANGE_SIM_PIN);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeInt32(3);
     mParcel.writeString(oldPin.c_str());
     mParcel.writeString(newPin.c_str());
     mParcel.writeString(aid.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::changeIccPin2(std::string oldPin2, std::string newPin2)
+int RILRequest::changeIccPin2(std::string oldPin2, std::string newPin2)
 {
-    changeIccPin2ForApp(oldPin2, newPin2, "");
+    return changeIccPin2ForApp(oldPin2, newPin2, "");
 }
 
-void RILRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid)
+int RILRequest::changeIccPin2ForApp(std::string oldPin2, std::string newPin2, std::string aid)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
     obtain(RIL_REQUEST_CHANGE_SIM_PIN2);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeInt32(3);
     mParcel.writeString(oldPin2.c_str());
     mParcel.writeString(newPin2.c_str());
     mParcel.writeString(aid.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd)
+int RILRequest::changeBarringPassword(std::string facility, std::string oldPwd, std::string newPwd)
 {
     obtain(RIL_REQUEST_CHANGE_BARRING_PASSWORD);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeInt32(3);
     mParcel.writeString(facility.c_str());
     mParcel.writeString(oldPwd.c_str());
     mParcel.writeString(newPwd.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::supplyNetworkDepersonalization(std::string netpin)
+int RILRequest::supplyNetworkDepersonalization(std::string netpin)
 {
     obtain(RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeInt32(1);
     mParcel.writeString(netpin.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getCurrentCalls()
+int RILRequest::getCurrentCalls()
 {
     obtain(RIL_REQUEST_GET_CURRENT_CALLS);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-__attribute_deprecated__ void RILRequest::getPDPContextList()
+__attribute_deprecated__ int RILRequest::getPDPContextList()
 {
-    getDataCallList();
+    return getDataCallList();
 }
 
-void RILRequest::getDataCallList()
+int RILRequest::getDataCallList()
 {
     obtain(RIL_REQUEST_DATA_CALL_LIST);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::dial(std::string address, int clirMode)
+int RILRequest::dial(std::string address, int clirMode)
 {
-    dial(address, clirMode, nullptr);
+    return dial(address, clirMode, nullptr);
 }
 
-void RILRequest::dial(std::string address, int clirMode, RIL_UUS_Info *uusInfo)
+int RILRequest::dial(std::string address, int clirMode, RIL_UUS_Info *uusInfo)
 {
     obtain(RIL_REQUEST_DIAL);
 
@@ -989,366 +946,342 @@ void RILRequest::dial(std::string address, int clirMode, RIL_UUS_Info *uusInfo)
         // mParcel.writeByteAarray(uusInfo.getUserData());
     }
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-    if (!blockSend(this))
-    {
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
 /**
  * Be careful, insert SIM card, before call this function
  * or the rild will dump
  */
-void RILRequest::getIMSI()
+int RILRequest::getIMSI()
 {
     obtain(RIL_REQUEST_GET_IMSI);
 
     mParcel.writeInt32(0);
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getIMEI()
+int RILRequest::getIMEI()
 {
     obtain(RIL_REQUEST_GET_IMEI);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getIMEISV()
+int RILRequest::getIMEISV()
 {
     obtain(RIL_REQUEST_GET_IMEISV);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::hangupConnection(int gsmIndex)
+int RILRequest::hangupConnection(int gsmIndex)
 {
     LOGFW("hangupConnection: gsmIndex = ", gsmIndex);
 
     obtain(RIL_REQUEST_HANGUP);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << gsmIndex << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << gsmIndex << ENDL;
 
     mParcel.writeInt32(1);
     mParcel.writeInt32(gsmIndex);
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::hangupWaitingOrBackground()
+int RILRequest::hangupWaitingOrBackground()
 {
     obtain(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::hangupForegroundResumeBackground()
+int RILRequest::hangupForegroundResumeBackground()
 {
     obtain(RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::switchWaitingOrHoldingAndActive()
+int RILRequest::switchWaitingOrHoldingAndActive()
 {
     obtain(RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::conference()
+int RILRequest::conference()
 {
     obtain(RIL_REQUEST_CONFERENCE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setPreferredVoicePrivacy(bool enable)
+int RILRequest::setPreferredVoicePrivacy(bool enable)
 {
     obtain(RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE);
 
     mParcel.writeInt32(1);
     mParcel.writeInt32(enable ? 1 : 0);
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getPreferredVoicePrivacy()
+int RILRequest::getPreferredVoicePrivacy()
 {
     obtain(RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE);
-    if (!blockSend(this))
-    {
+
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::separateConnection(int gsmIndex)
+int RILRequest::separateConnection(int gsmIndex)
 {
     obtain(RIL_REQUEST_SEPARATE_CONNECTION);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << gsmIndex << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << gsmIndex << ENDL;
 
     mParcel.writeInt32(1);
     mParcel.writeInt32(gsmIndex);
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::acceptCall()
+int RILRequest::acceptCall()
 {
     obtain(RIL_REQUEST_ANSWER);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::rejectCall()
+int RILRequest::rejectCall()
 {
     obtain(RIL_REQUEST_UDUB);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::explicitCallTransfer()
+int RILRequest::explicitCallTransfer()
 {
     obtain(RIL_REQUEST_EXPLICIT_CALL_TRANSFER);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getLastCallFailCause()
+int RILRequest::getLastCallFailCause()
 {
     obtain(RIL_REQUEST_LAST_CALL_FAIL_CAUSE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-__attribute_deprecated__ void RILRequest::getLastPdpFailCause()
+__attribute_deprecated__ int RILRequest::getLastPdpFailCause()
 {
-    getLastDataCallFailCause();
+    return getLastDataCallFailCause();
 }
 
 /**
  * The prefethised new(std::nothrow) alternative to getLastPdpFailCause
  */
-void RILRequest::getLastDataCallFailCause()
+int RILRequest::getLastDataCallFailCause()
 {
     obtain(RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setMute(bool enableMute)
+int RILRequest::setMute(bool enableMute)
 {
     obtain(RIL_REQUEST_SET_MUTE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << enableMute << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << enableMute << ENDL;
 
     mParcel.writeInt32(1);
     mParcel.writeInt32(enableMute ? 1 : 0);
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getMute()
+int RILRequest::getMute()
 {
     obtain(RIL_REQUEST_GET_MUTE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getSignalStrength()
+int RILRequest::getSignalStrength()
 {
     obtain(RIL_REQUEST_SIGNAL_STRENGTH);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getVoiceRegistrationState()
+int RILRequest::getVoiceRegistrationState()
 {
     obtain(RIL_REQUEST_VOICE_REGISTRATION_STATE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getDataRegistrationState()
+int RILRequest::getDataRegistrationState()
 {
     obtain(RIL_REQUEST_DATA_REGISTRATION_STATE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getOperator()
+int RILRequest::getOperator()
 {
     obtain(RIL_REQUEST_OPERATOR);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::sendDtmf(char c)
+int RILRequest::sendDtmf(char c)
 {
     obtain(RIL_REQUEST_DTMF);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeString(std::to_string(int(c)).c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::startDtmf(char c)
+int RILRequest::startDtmf(char c)
 {
     obtain(RIL_REQUEST_DTMF_START);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeString(std::to_string(int(c)).c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::stopDtmf()
+int RILRequest::stopDtmf()
 {
     obtain(RIL_REQUEST_DTMF_STOP);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::sendBurstDtmf(std::string dtmfString, int on, int off)
+int RILRequest::sendBurstDtmf(std::string dtmfString, int on, int off)
 {
     obtain(RIL_REQUEST_CDMA_BURST_DTMF);
 
@@ -1357,16 +1290,15 @@ void RILRequest::sendBurstDtmf(std::string dtmfString, int on, int off)
     mParcel.writeString(std::to_string(on).c_str());
     mParcel.writeString(std::to_string(off).c_str());
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << dtmfString << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << dtmfString << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::sendSMS(std::string smscPDU, std::string pdu)
+int RILRequest::sendSMS(std::string smscPDU, std::string pdu)
 {
     obtain(RIL_REQUEST_SEND_SMS);
 
@@ -1374,16 +1306,15 @@ void RILRequest::sendSMS(std::string smscPDU, std::string pdu)
     mParcel.writeString(smscPDU.c_str());
     mParcel.writeString(pdu.c_str());
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-// void RILRequest::sendCdmaSms(uint8_t *pdu)
+// int RILRequest::sendCdmaSms(uint8_t *pdu)
 // {
 //     int address_nbr_of_digits;
 //     int subaddr_nbr_of_digits;
@@ -1431,12 +1362,12 @@ void RILRequest::sendSMS(std::string smscPDU, std::string pdu)
 //         riljLog("sendSmsCdma: conversion from input stream to object failed: " + ex);
 //     }
 
-//     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//     LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 //     mResponse = result;
 // }
 
-void RILRequest::deleteSmsOnSim(int index)
+int RILRequest::deleteSmsOnSim(int index)
 {
     obtain(RIL_REQUEST_DELETE_SMS_ON_SIM);
 
@@ -1444,16 +1375,15 @@ void RILRequest::deleteSmsOnSim(int index)
     mParcel.writeInt32(index);
 
     if (false)
-        LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << index << ENDL;
+        LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << index << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::deleteSmsOnRuim(int index)
+int RILRequest::deleteSmsOnRuim(int index)
 {
     obtain(RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM);
 
@@ -1461,13 +1391,12 @@ void RILRequest::deleteSmsOnRuim(int index)
     mParcel.writeInt32(index);
 
     if (false)
-        LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << index << ENDL;
+        LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << index << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
 /** Free space (TS 51.011 10.5.3 / 3GPP2 C.S0023 3.4.27). */
@@ -1502,7 +1431,7 @@ int RILRequest::translateStatus(int status)
     return 1;
 }
 
-void RILRequest::writeSmsToSim(int status, std::string smsc, std::string pdu)
+int RILRequest::writeSmsToSim(int status, std::string smsc, std::string pdu)
 {
     status = translateStatus(status);
 
@@ -1513,16 +1442,15 @@ void RILRequest::writeSmsToSim(int status, std::string smsc, std::string pdu)
     mParcel.writeString(smsc.c_str());
 
     if (false)
-        LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << status << ENDL;
+        LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << status << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::writeSmsToRuim(int status, std::string pdu)
+int RILRequest::writeSmsToRuim(int status, std::string pdu)
 {
     status = translateStatus(status);
 
@@ -1532,17 +1460,16 @@ void RILRequest::writeSmsToRuim(int status, std::string pdu)
     mParcel.writeString(pdu.c_str());
 
     if (false)
-        LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << status << ENDL;
+        LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << status << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setupDataCall(std::string radioTechnology, std::string profile, std::string apn,
-                               std::string user, std::string password, std::string authType, std::string protocol)
+int RILRequest::setupDataCall(std::string radioTechnology, std::string profile, std::string apn,
+                              std::string user, std::string password, std::string authType, std::string protocol)
 {
     obtain(RIL_REQUEST_SETUP_DATA_CALL);
 
@@ -1556,18 +1483,17 @@ void RILRequest::setupDataCall(std::string radioTechnology, std::string profile,
     mParcel.writeString(authType.c_str());
     mParcel.writeString(protocol.c_str());
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " "
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " "
          << radioTechnology + " " + profile + " " + apn + " " + user + " "
          << password + " " + authType + " " + protocol << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::deactivateDataCall(int cid, int reason)
+int RILRequest::deactivateDataCall(int cid, int reason)
 {
     obtain(RIL_REQUEST_DEACTIVATE_DATA_CALL);
 
@@ -1575,49 +1501,46 @@ void RILRequest::deactivateDataCall(int cid, int reason)
     mParcel.writeString(std::to_string(cid).c_str());
     mParcel.writeString(std::to_string(reason).c_str());
 
-    LOGD << requestidToString(getRequestId()) + "> "
+    LOGI << requestidToString(getRequestId()) + "> "
          << commandidToString(getCommandId()) << " " << cid << " " << reason << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setRadioPower(bool on)
+int RILRequest::setRadioPower(bool on)
 {
     obtain(RIL_REQUEST_RADIO_POWER);
 
     mParcel.writeInt32(1);
     mParcel.writeInt32(on ? 1 : 0);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << (on ? " on" : " off") << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << (on ? " on" : " off") << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setSuppServiceNotifications(bool enable)
+int RILRequest::setSuppServiceNotifications(bool enable)
 {
     obtain(RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION);
 
     mParcel.writeInt32(1);
     mParcel.writeInt32(enable ? 1 : 0);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::acknowledgeLastIncomingGsmSms(bool success, int cause)
+int RILRequest::acknowledgeLastIncomingGsmSms(bool success, int cause)
 {
     obtain(RIL_REQUEST_SMS_ACKNOWLEDGE);
 
@@ -1625,16 +1548,15 @@ void RILRequest::acknowledgeLastIncomingGsmSms(bool success, int cause)
     mParcel.writeInt32(success ? 1 : 0);
     mParcel.writeInt32(cause);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << success << " " << cause << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << success << " " << cause << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause)
+int RILRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause)
 {
     obtain(RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE);
 
@@ -1642,16 +1564,15 @@ void RILRequest::acknowledgeLastIncomingCdmaSms(bool success, int cause)
     // cause code according to X.S004-550E
     mParcel.writeInt32(cause);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << success << " " << cause << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << success << " " << cause << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu)
+int RILRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackPdu)
 {
     obtain(RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU);
 
@@ -1659,17 +1580,16 @@ void RILRequest::acknowledgeIncomingGsmSmsWithPdu(bool success, std::string ackP
     mParcel.writeString(success ? "1" : "0");
     mParcel.writeString(ackPdu.c_str());
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ' ' << success << " [" + ackPdu + ']' << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ' ' << success << " [" + ackPdu + ']' << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
-                       std::string data, std::string pin2)
+int RILRequest::iccIO(int command, int fileid, std::string path, int p1, int p2, int p3,
+                      std::string data, std::string pin2)
 {
     //Note: This RIL request has not been renamed to ICC,
     //       but this request is also valid for SIM and RUIM
@@ -1684,31 +1604,29 @@ void RILRequest::iccIO(int command, int fileid, std::string path, int p1, int p2
     mParcel.writeString(data.c_str());
     mParcel.writeString(pin2.c_str());
 
-    LOGD << requestidToString(getRequestId()) + "> iccIO: " << commandidToString(getCommandId())
+    LOGI << requestidToString(getRequestId()) + "> iccIO: " << commandidToString(getCommandId())
          << " 0x" << std::hex << command << " 0x" << fileid << " "
          << " path: " << path << "," << p1 << "," << p2 << "," << p3 << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getCLIR()
+int RILRequest::getCLIR()
 {
     obtain(RIL_REQUEST_GET_CLIR);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setCLIR(int clirMode)
+int RILRequest::setCLIR(int clirMode)
 {
     obtain(RIL_REQUEST_SET_CLIR);
 
@@ -1717,33 +1635,31 @@ void RILRequest::setCLIR(int clirMode)
 
     mParcel.writeInt32(clirMode);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << clirMode << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << clirMode << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::queryCallWaiting(int serviceClass)
+int RILRequest::queryCallWaiting(int serviceClass)
 {
     obtain(RIL_REQUEST_QUERY_CALL_WAITING);
 
     mParcel.writeInt32(1);
     mParcel.writeInt32(serviceClass);
 
-    LOGD << requestidToString(getRequestId()) + "> "
+    LOGI << requestidToString(getRequestId()) + "> "
          << commandidToString(getCommandId()) << " " << serviceClass << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setCallWaiting(bool enable, int serviceClass)
+int RILRequest::setCallWaiting(bool enable, int serviceClass)
 {
     obtain(RIL_REQUEST_SET_CALL_WAITING);
 
@@ -1751,71 +1667,66 @@ void RILRequest::setCallWaiting(bool enable, int serviceClass)
     mParcel.writeInt32(enable ? 1 : 0);
     mParcel.writeInt32(serviceClass);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << enable << ", " << serviceClass << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << enable << ", " << serviceClass << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setNetworkSelectionModeAutomatic()
+int RILRequest::setNetworkSelectionModeAutomatic()
 {
     obtain(RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setNetworkSelectionModeManual(std::string operatorNumeric)
+int RILRequest::setNetworkSelectionModeManual(std::string operatorNumeric)
 {
     obtain(RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " + operatorNumeric << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " + operatorNumeric << ENDL;
 
     mParcel.writeString(operatorNumeric.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getNetworkSelectionMode()
+int RILRequest::getNetworkSelectionMode()
 {
     obtain(RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getAvailableNetworks()
+int RILRequest::getAvailableNetworks()
 {
     obtain(RIL_REQUEST_QUERY_AVAILABLE_NETWORKS);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setCallForward(int action, int cfReason, int serviceClass,
-                                std::string number, int timeSeconds)
+int RILRequest::setCallForward(int action, int cfReason, int serviceClass,
+                               std::string number, int timeSeconds)
 {
     obtain(RIL_REQUEST_SET_CALL_FORWARD);
 
@@ -1826,18 +1737,17 @@ void RILRequest::setCallForward(int action, int cfReason, int serviceClass,
     mParcel.writeString(number.c_str());
     mParcel.writeInt32(timeSeconds);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " "
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " "
          << action << " " << cfReason << " " << serviceClass << timeSeconds << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::queryCallForwardStatus(int cfReason, int serviceClass,
-                                        std::string number)
+int RILRequest::queryCallForwardStatus(int cfReason, int serviceClass,
+                                       std::string number)
 {
     obtain(RIL_REQUEST_QUERY_CALL_FORWARD_STATUS);
 
@@ -1848,53 +1758,50 @@ void RILRequest::queryCallForwardStatus(int cfReason, int serviceClass,
     mParcel.writeString(number.c_str());
     mParcel.writeInt32(0);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " "
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " "
          << cfReason << " " << serviceClass << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::queryCLIP()
+int RILRequest::queryCLIP()
 {
     obtain(RIL_REQUEST_QUERY_CLIP);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getBasebandVersion()
+int RILRequest::getBasebandVersion()
 {
     obtain(RIL_REQUEST_BASEBAND_VERSION);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::queryFacilityLock(std::string facility, std::string password, int serviceClass)
+int RILRequest::queryFacilityLock(std::string facility, std::string password, int serviceClass)
 {
-    queryFacilityLockForApp(facility, password, serviceClass, "");
+    return queryFacilityLockForApp(facility, password, serviceClass, "");
 }
 
-void RILRequest::queryFacilityLockForApp(std::string facility, std::string password,
-                                         int serviceClass, std::string appId)
+int RILRequest::queryFacilityLockForApp(std::string facility, std::string password,
+                                        int serviceClass, std::string appId)
 {
     obtain(RIL_REQUEST_QUERY_FACILITY_LOCK);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     // count strings
     mParcel.writeInt32(4);
@@ -1905,26 +1812,25 @@ void RILRequest::queryFacilityLockForApp(std::string facility, std::string passw
     mParcel.writeString(std::to_string(serviceClass).c_str());
     mParcel.writeString(appId.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setFacilityLock(std::string facility, bool lockState, std::string password,
-                                 int serviceClass)
+int RILRequest::setFacilityLock(std::string facility, bool lockState, std::string password,
+                                int serviceClass)
 {
-    setFacilityLockForApp(facility, lockState, password, serviceClass, "");
+    return setFacilityLockForApp(facility, lockState, password, serviceClass, "");
 }
 
-void RILRequest::setFacilityLockForApp(std::string facility, bool lockState, std::string password,
-                                       int serviceClass, std::string appId)
+int RILRequest::setFacilityLockForApp(std::string facility, bool lockState, std::string password,
+                                      int serviceClass, std::string appId)
 {
     std::string lockString;
     obtain(RIL_REQUEST_SET_FACILITY_LOCK);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     // count strings
     mParcel.writeInt32(5);
@@ -1936,81 +1842,76 @@ void RILRequest::setFacilityLockForApp(std::string facility, bool lockState, std
     mParcel.writeString(std::to_string(serviceClass).c_str());
     mParcel.writeString(appId.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::sendUSSD(std::string ussdString)
+int RILRequest::sendUSSD(std::string ussdString)
 {
     obtain(RIL_REQUEST_SEND_USSD);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " + ussdString << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " + ussdString << ENDL;
 
     mParcel.writeString(ussdString.c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::cancelPendingUssd()
+int RILRequest::cancelPendingUssd()
 {
     obtain(RIL_REQUEST_CANCEL_USSD);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::resetRadio()
+int RILRequest::resetRadio()
 {
     obtain(RIL_REQUEST_RESET_RADIO);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-// void RILRequest::invokeOemRilRequestRaw(uint8_t *data)
+// int RILRequest::invokeOemRilRequestRaw(uint8_t *data)
 // {
 //     obtain(//               RIL_REQUEST_OEM_HOOK_RAW,
 //               result);
 
-//     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << "[" + IccUtils.bytesToHexString(data) + "]" << ENDL;
+//     LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << "[" + IccUtils.bytesToHexString(data) + "]" << ENDL;
 
 //     mParcel.writeByteAthisay(data);
-//     if (!blockSend(this)){
+//     if (!nonblockSend(this)){
 //     mResponse = result;
 // }
 
-void RILRequest::invokeOemRILRequestStrings(std::vector<std::string> strings)
+int RILRequest::invokeOemRILRequestStrings(std::vector<std::string> strings)
 {
     obtain(RIL_REQUEST_OEM_HOOK_STRINGS);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeInt32(strings.size());
     for (size_t i = 0; i < strings.size(); i++)
         mParcel.writeString(strings.at(i).c_str());
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
 /**
@@ -2019,20 +1920,19 @@ void RILRequest::invokeOemRILRequestStrings(std::vector<std::string> strings)
  * @param bandMode one of BM_*_BAND
  * @param response is callback message
  */
-void RILRequest::setBandMode(int bandMode)
+int RILRequest::setBandMode(int bandMode)
 {
     obtain(RIL_REQUEST_SET_BAND_MODE);
 
     mParcel.writeInt32(1);
     mParcel.writeInt32(bandMode);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << bandMode << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " " << bandMode << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
 /**
@@ -2043,78 +1943,77 @@ void RILRequest::setBandMode(int bandMode)
  *        ((AsyncResult)response.obj).result  is an int[] with every
  *        element representing one avialable BM_*_BAND
  */
-void RILRequest::queryAvailableBandMode()
+int RILRequest::queryAvailableBandMode()
 {
     obtain(RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::sendTerminalResponse(std::string contents)
+int RILRequest::sendTerminalResponse(std::string contents)
 {
     obtain(RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeString(contents.c_str());
-    if (!blockSend(this))
-    {
+
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::sendEnvelope(std::string contents)
+int RILRequest::sendEnvelope(std::string contents)
 {
     obtain(RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
     mParcel.writeString(contents.c_str());
-    if (!blockSend(this))
-    {
+
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::sendEnvelopeWithStatus(std::string contents)
+int RILRequest::sendEnvelopeWithStatus(std::string contents)
 {
     obtain(RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << '[' + contents + ']' << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << '[' + contents + ']' << ENDL;
 
     mParcel.writeString(contents.c_str());
-    if (!blockSend(this))
-    {
+
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-// void RILRequest::handleCallSetupRequestFromSim(
+// int RILRequest::handleCallSetupRequestFromSim(
 //     bool accept)
 // {
 
 //     obtain(//         RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM,
 //         result);
 
-//     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
 //     int[] param = new(std::nothrow) int[1];
 //     param[0] = accept ? 1 : 0;
 //     mParcel.writeIntthisay(param);
-//     if (!blockSend(this)){
+//     if (!nonblockSend(this)){
 //     mResponse = result;
 // }
 
-// void RILRequest::setPrefethisedNetworkType(int networkType)
+// int RILRequest::setPrefethisedNetworkType(int networkType)
 // {
 //     obtain(//         RIL_REQUEST_SET_PREFEthisED_NETWORK_TYPE,
 //         result);
@@ -2125,122 +2024,114 @@ void RILRequest::sendEnvelopeWithStatus(std::string contents)
 //     mSetPrefethisedNetworkType = networkType;
 //     mPrefethisedNetworkType = networkType;
 
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) <<  " : " + networkType);
-//         if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) <<  " : " + networkType);
+//         if (!nonblockSend(this)){
 //         mResponse = result;
 // }
 
-void RILRequest::getPreferredNetworkType()
+int RILRequest::getPreferredNetworkType()
 {
     obtain(RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getNeighboringCids()
+int RILRequest::getNeighboringCids()
 {
     obtain(RIL_REQUEST_GET_NEIGHBORING_CELL_IDS);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setLocationUpdates(bool enable)
+int RILRequest::setLocationUpdates(bool enable)
 {
     obtain(RIL_REQUEST_SET_LOCATION_UPDATES);
     mParcel.writeInt32(1);
     mParcel.writeInt32(enable ? 1 : 0);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ": " << enable << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ": " << enable << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getSmscAddress()
+int RILRequest::getSmscAddress()
 {
     obtain(RIL_REQUEST_GET_SMSC_ADDRESS);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::setSmscAddress(std::string address)
+int RILRequest::setSmscAddress(std::string address)
 {
     obtain(RIL_REQUEST_SET_SMSC_ADDRESS);
 
     mParcel.writeString(address.c_str());
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " : " + address << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << " : " + address << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::reportSmsMemoryStatus(bool available)
+int RILRequest::reportSmsMemoryStatus(bool available)
 {
     obtain(RIL_REQUEST_REPORT_SMS_MEMORY_STATUS);
     mParcel.writeInt32(1);
     mParcel.writeInt32(available ? 1 : 0);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ": " << available << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ": " << available << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::reportStkServiceIsRunning()
+int RILRequest::reportStkServiceIsRunning()
 {
     obtain(RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-void RILRequest::getGsmBroadcastConfig()
+int RILRequest::getGsmBroadcastConfig()
 {
     obtain(RIL_REQUEST_GSM_GET_BROADCAST_SMS_CONFIG);
 
-    LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-    if (!blockSend(this))
-    {
+    int ret = nonblockSend(this);
+    if (!ret)
         LOGE << "send request failed" << ENDL;
-        return;
-    }
+    return ret ? 0 : -1;
 }
 
-// void RILRequest::setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config)
+// int RILRequest::setGsmBroadcastConfig(SmsBroadcastConfigInfo[] config)
 // {
 //     obtain(//           RIL_REQUEST_GSM_SET_BROADCAST_CONFIG,
 //           result);
@@ -2258,26 +2149,26 @@ void RILRequest::getGsmBroadcastConfig()
 //     }
 
 //     {
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) <<  " with " + numOfConfig + " configs : ");
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) <<  " with " + numOfConfig + " configs : ");
 //         for (int i = 0; i < numOfConfig; i++)
 //         {
 //             riljLog(config[i].toString());
 //         }
 //     }
-//     if (!blockSend(this)){
+//     if (!nonblockSend(this)){
 //     mResponse = result;
 // }
 
-// void RILRequest::setGsmBroadcastActivation(bool activate)
+// int RILRequest::setGsmBroadcastActivation(bool activate)
 // {
 //     obtain(RIL_REQUEST_GSM_BROADCAST_ACTIVATION);
 
 //     mParcel.writeInt32(1);
 //     mParcel.writeInt32(activate ? 0 : 1);
 
-//     LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-//     if (!blockSend(this))
+//     if (!nonblockSend(this))
 //     {
 //         LOGE << "send request failed" << ENDL;
 //         return;
@@ -2293,7 +2184,7 @@ void RILRequest::getGsmBroadcastConfig()
 //     mParcel.writeInt32(on ? 1 : 0);
 //
 //         LOGD << equestidString(getRequestId()) + "> " << commandidToString(getCommandId()) <<  ": " + on);
-// if (!blockSend(this)){
+// if (!nonblockSend(this)){
 // mResponse = result;
 // }
 
@@ -2304,8 +2195,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     obtain(IL_REQUEST_DEVICE_IDENTITY);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 // }
 
 // public
@@ -2314,8 +2205,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     obtain(IL_REQUEST_CDMA_SUBSCRIPTION);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 // }
 
 // void setPhoneType(int phoneType)
@@ -2334,8 +2225,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     obtain(//         RILConstants.RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 // }
 
 // /**
@@ -2350,8 +2241,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     this.mp.writeInt32(cdmaRoamingType);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + cdmaRoamingType);
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + cdmaRoamingType);
+//     if (!nonblockSend(this)){
 // }
 
 // /**
@@ -2366,8 +2257,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     this.mp.writeInt32(cdmaSubscription);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + cdmaSubscription);
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + cdmaSubscription);
+//     if (!nonblockSend(this)){
 // }
 
 // /**
@@ -2378,8 +2269,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     obtain(//         RILConstants.RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 // }
 
 // /**
@@ -2391,8 +2282,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     obtain(//         RILConstants.RIL_REQUEST_QUERY_TTY_MODE);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 // }
 
 // /**
@@ -2407,8 +2298,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     this.mp.writeInt32(ttyMode);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + ttyMode);
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + ttyMode);
+//     if (!nonblockSend(this)){
 // }
 
 // /**
@@ -2422,15 +2313,15 @@ void RILRequest::getGsmBroadcastConfig()
 //     this.mp.writeString(FeatureCode);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + FeatureCode);
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL+ " : " + FeatureCode);
+//     if (!nonblockSend(this)){
 // }
 
 // public
 // void getCdmaBroadcastConfig(RilResponse *response)
 // {
 //     obtain(IL_REQUEST_CDMA_GET_BROADCAST_CONFIG);
-//     if (!blockSend(this)){
+//     if (!nonblockSend(this)){
 // }
 
 // // TODO: Change the configValuesAthisay to a RIL_BroadcastSMSConfig
@@ -2445,8 +2336,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     }
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 // }
 
 // public
@@ -2458,8 +2349,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     this.mp.writeInt32(activate ? 0 : 1);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 // }
 
 // /**
@@ -2471,8 +2362,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     obtain(IL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 // }
 
 // public
@@ -2483,8 +2374,8 @@ void RILRequest::getGsmBroadcastConfig()
 //     this.mp.writeString(nonce);
 
 //
-//         LOGD << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
-//     if (!blockSend(this)){
+//         LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+//     if (!nonblockSend(this)){
 // }
 // }
 
@@ -2497,38 +2388,43 @@ void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
     else
         LOGI << "RESP < " << commandidToString(rr->getCommandId()) << ENDL;
 
-    rr->mResponse.setError(error);
-    rr->mResponse.setCommandId(rr->getCommandId());
-    rr->mResponse.setURC(false);
+    rr->mResponse->command_id = rr->getCommandId();
+    rr->mResponse->error_code = error;
+    rr->mResponse->is_unsocilited = 0;
+    clock_gettime(CLOCK_MONOTONIC, &rr->mResponse->finish_time);
+
     if (error == 0 || p.dataAvail() > 0)
     {
         // either command succeeds or command fails but with data payload
         auto processer = SocilitedProcesser.find(rr->getCommandId());
         if (processer != SocilitedProcesser.end())
         {
-            processer->second(p);
+            processer->second(p, rr->mResponse);
         }
         else
         {
             LOGE << "undefined response processer for " << commandidToString(rr->getCommandId()) << ENDL;
         }
     }
+
+    // notice caller immediatelly
+    rr->mResponse->notify(rr->mResponse->userdata);
+    delete rr;
 }
 
 void RILRequest::processUnsolicited(Parcel &p)
 {
     int cmdid = p.readInt32();
 
-    // rr->mResponse.setError(0);
-    // rr->mResponse.setCommandId(rr->getCommandId());
-    // rr->mResponse.setURC(false);
+    mResponse->error_code = FIELD_INVALID;
+    mResponse->is_unsocilited = 1;
 
     LOGI << "RESP < " << responseToString(cmdid) << ENDL;
     // either command succeeds or command fails but with data payload
     auto processer = UnsocilitedProcesser.find(cmdid);
     if (processer != UnsocilitedProcesser.end())
     {
-        processer->second(p);
+        processer->second(p, nullptr);
     }
     else
     {

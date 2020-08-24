@@ -8,58 +8,59 @@
 
 #include "ril/ril.h"
 #include "parcel/parcel.h"
+#include "rilc_interface.h"
 
 std::string responseToString(int respid);
 
-void responseVoid(Parcel &p);
+void responseVoid(Parcel &, RILResponse *p);
 
-void responseInts(Parcel &p);
+void responseInts(Parcel &, RILResponse *p);
 
-void responseString(Parcel &p);
+void responseString(Parcel &, RILResponse *p);
 
-void responseStrings(Parcel &p);
+void responseStrings(Parcel &, RILResponse *p);
 
 /* private process functions */
-void responseIccCardStatus(Parcel &);
+void responseIccCardStatus(Parcel &, RILResponse *);
 
-void responseCallList(Parcel &);
+void responseCallList(Parcel &, RILResponse *);
 
-void responseSignalStrength(Parcel &);
+void responseSignalStrength(Parcel &, RILResponse *);
 
-void responseSMS(Parcel &);
+void responseSMS(Parcel &, RILResponse *);
 
-void responseSetupDataCall(Parcel &);
+void responseSetupDataCall(Parcel &, RILResponse *);
 
-void responseICC_IO(Parcel &);
+void responseICC_IO(Parcel &, RILResponse *);
 
-void responseCallForward(Parcel &);
+void responseCallForward(Parcel &, RILResponse *);
 
-void responseOperatorInfos(Parcel &);
+void responseOperatorInfos(Parcel &, RILResponse *);
 
-void responseDataCallList(Parcel &);
+void responseDataCallList(Parcel &, RILResponse *);
 
-void responseRaw(Parcel &);
+void responseRaw(Parcel &, RILResponse *);
 
-void responseGetPreferredNetworkType(Parcel &);
+void responseGetPreferredNetworkType(Parcel &, RILResponse *);
 
-void responseCellList(Parcel &);
+void responseCellList(Parcel &, RILResponse *);
 
-void responseGmsBroadcastConfig(Parcel &);
+void responseGmsBroadcastConfig(Parcel &, RILResponse *);
 
-void responseCdmaBroadcastConfig(Parcel &);
+void responseCdmaBroadcastConfig(Parcel &, RILResponse *);
 
-void responseSuppServiceNotification(Parcel &);
+void responseSuppServiceNotification(Parcel &, RILResponse *);
 
-void responseCallRing(Parcel &);
+void responseCallRing(Parcel &, RILResponse *);
 
-void responseCdmaSms(Parcel &);
+void responseCdmaSms(Parcel &, RILResponse *);
 
-void responseCdmaCallWaiting(Parcel &);
+void responseCdmaCallWaiting(Parcel &, RILResponse *);
 
-void responseCdmaInformationRecord(Parcel &);
+void responseCdmaInformationRecord(Parcel &, RILResponse *);
 
 /* socilited response handlers */
-static std::map<int, std::function<void(Parcel &)>> SocilitedProcesser = {
+static std::map<int, std::function<void(Parcel &, RILResponse *)>> SocilitedProcesser = {
     {RIL_REQUEST_GET_SIM_STATUS, responseIccCardStatus},
     {RIL_REQUEST_ENTER_SIM_PIN, responseInts},
     {RIL_REQUEST_ENTER_SIM_PUK, responseInts},
@@ -170,7 +171,7 @@ static std::map<int, std::function<void(Parcel &)>> SocilitedProcesser = {
     {RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU, responseVoid},
     {RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS, responseICC_IO}};
 
-static std::map<int, std::function<void(Parcel &)>> UnsocilitedProcesser = {
+static std::map<int, std::function<void(Parcel &, RILResponse *)>> UnsocilitedProcesser = {
     {RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED, responseVoid},
     {RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED, responseVoid},
     {RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED, responseVoid},
@@ -302,15 +303,5 @@ static std::map<int, std::function<void(Parcel &)>> UnsocilitedProcesser = {
 // {RIL_EXT_UNSOL_PPP_DATA_PDP_INFO, "RIL_EXT_UNSOL_PPP_DATA_PDP_INFO"},
 #endif
 };
-
-typedef enum
-{
-    RESP_STR,     /* response is string */
-    RESP_STR_ARR, /* response is string array */
-    RESP_INT,     /* response is int */
-    RESP_INT_ARR, /* response is int array */
-    RESP_RAWDATA, /* response raw binary data */
-    RESP_VOID     /* no response */
-} response_type_e;
 
 #endif //__RIL_RESPONSE

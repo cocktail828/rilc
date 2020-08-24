@@ -3,12 +3,11 @@
 #include "ril_response.h"
 #include "logger.h"
 
-void responseStrings(Parcel &p)
+void responseStrings(Parcel &p, RILResponse *resp)
 {
-    int num;
     std::vector<std::string> response;
+    int num = p.readInt32();
 
-    num = p.readInt32();
     for (int i = 0; i < num; i++)
     {
         auto str = p.readString();
@@ -16,42 +15,67 @@ void responseStrings(Parcel &p)
         p.freeString(str);
     }
 
-    LOGI << "UNMARSHAL: num of string " << num << ENDL;
-    LOGI << "UNMARSHAL: ";
+    if (resp)
+    {
+        resp->type = TYPE_STRING_ARR;
+        char **data = (char **)malloc(num * sizeof(char **));
+        for (int i = 0; i < num; i++)
+            data[i] = strdup(response[i].c_str());
+
+        resp->response_data.array.data = data;
+        resp->response_data.array.num = num;
+    }
+
+    LOGD << "UNMARSHAL: num of string " << num << ENDL;
+    LOGD << "UNMARSHAL: ";
     for (auto i : response)
-        LOGI << i << " ";
-    LOGI << ENDL;
+        LOGD << i << " ";
+    LOGD << ENDL;
 }
 
-void responseString(Parcel &p)
+void responseString(Parcel &p, RILResponse *resp)
 {
     const char *response = p.readString();
     std::string mRespString = response;
     p.freeString(response);
 
-    LOGI << "UNMARSHAL: " << mRespString << ENDL;
+    if (resp)
+    {
+        resp->type = TYPE_STRING;
+        resp->response_data.value_string = strdup(mRespString.c_str());
+    }
+    LOGD << "UNMARSHAL: " << mRespString << ENDL;
 }
 
-void responseInts(Parcel &p)
+void responseInts(Parcel &p, RILResponse *resp)
 {
-    int numInts;
     std::vector<int> response;
+    int num = p.readInt32();
 
-    numInts = p.readInt32();
-
-    for (int i = 0; i < numInts; i++)
+    for (int i = 0; i < num; i++)
     {
         int data = p.readInt32();
         response.emplace_back(data);
     }
 
-    LOGI << "UNMARSHAL: ";
+    if (resp)
+    {
+        resp->type = TYPE_INT_ARR;
+        int *data = (int *)malloc(num * sizeof(int));
+        for (int i = 0; i < num; i++)
+            data[i] = response[i];
+
+        resp->response_data.array.data = data;
+        resp->response_data.array.num = num;
+    }
+
+    LOGD << "UNMARSHAL: ";
     for (auto i : response)
-        LOGI << i << " ";
-    LOGI << ENDL;
+        LOGD << i << " ";
+    LOGD << ENDL;
 }
 
-void responseVoid(Parcel &p)
+void responseVoid(Parcel &p, RILResponse *resp)
 {
 }
 
@@ -215,7 +239,7 @@ void responseVoid(Parcel &p)
 //     return s;
 // }
 
-void responseCallForward(Parcel &p)
+void responseCallForward(Parcel &p, RILResponse *resp)
 {
     //     int numInfos;
     //     CallForwardInfo infos[];
@@ -237,7 +261,7 @@ void responseCallForward(Parcel &p)
     //     }
 }
 
-void responseSuppServiceNotification(Parcel &p)
+void responseSuppServiceNotification(Parcel &p, RILResponse *resp)
 {
     //     SuppServiceNotification notification = new SuppServiceNotification();
 
@@ -248,13 +272,13 @@ void responseSuppServiceNotification(Parcel &p)
     //     notification.number = p.readString();
 }
 
-void responseCdmaSms(Parcel &p)
+void responseCdmaSms(Parcel &p, RILResponse *resp)
 {
     //     SmsMessage sms;
     //     sms = SmsMessage.newFromParcel(p);
 }
 
-void responseRaw(Parcel &p)
+void responseRaw(Parcel &p, RILResponse *resp)
 {
     // int num;
     // byte response[];
@@ -264,7 +288,7 @@ void responseRaw(Parcel &p)
     // return response;
 }
 
-void responseSMS(Parcel &p)
+void responseSMS(Parcel &p, RILResponse *resp)
 {
     int messageRef, errorCode;
     std::string ackPDU;
@@ -276,7 +300,7 @@ void responseSMS(Parcel &p)
     // SmsResponse response = new SmsResponse(messageRef, ackPDU, errorCode);
 }
 
-void responseICC_IO(Parcel &p)
+void responseICC_IO(Parcel &p, RILResponse *resp)
 {
     //     int sw1, sw2;
     //     byte data[] = null;
@@ -293,7 +317,7 @@ void responseICC_IO(Parcel &p)
     //     return new IccIoResult(sw1, sw2, s);
 }
 
-void responseIccCardStatus(Parcel &p)
+void responseIccCardStatus(Parcel &p, RILResponse *resp)
 {
     RIL_CardStatus_v6 ca;
 
@@ -311,7 +335,7 @@ void responseIccCardStatus(Parcel &p)
     // }
 }
 
-void responseCallList(Parcel &p)
+void responseCallList(Parcel &p, RILResponse *resp)
 {
     //     int num;
     //     int voiceSettings;
@@ -427,7 +451,7 @@ void responseCallList(Parcel &p)
 //     return dataCall;
 // }
 
-void responseDataCallList(Parcel &p)
+void responseDataCallList(Parcel &p, RILResponse *resp)
 {
     //     ArrayList<DataCallState> response;
 
@@ -444,7 +468,7 @@ void responseDataCallList(Parcel &p)
     //     return response;
 }
 
-void responseSetupDataCall(Parcel &p)
+void responseSetupDataCall(Parcel &p, RILResponse *resp)
 {
     //     int ver = p.readInt32();
     //     int num = p.readInt32();
@@ -501,7 +525,7 @@ void responseSetupDataCall(Parcel &p)
     //     }
 }
 
-void responseOperatorInfos(Parcel &p)
+void responseOperatorInfos(Parcel &p, RILResponse *resp)
 {
     //     String strings[] = (String[])responseStrings(p);
     //     ArrayList<OperatorInfo> ret;
@@ -525,63 +549,35 @@ void responseOperatorInfos(Parcel &p)
     //     }
 }
 
-void responseCellList(Parcel &p)
+void responseCellList(Parcel &p, RILResponse *resp)
 {
-    //     int num, rssi;
-    //     String location;
-    //     ArrayList<NeighboringCellInfo> response;
-    //     NeighboringCellInfo cell;
+    int num, rssi;
+    std::string location;
+    std::vector<RIL_NeighboringCell> response;
 
-    //     num = p.readInt32();
-    //     response = new ArrayList<NeighboringCellInfo>();
+    num = p.readInt32();
 
-    //     // Determine the radio access type
-    //     String radioString = SystemProperties.get(
-    //         TelephonyProperties.PROPERTY_DATA_NETWORK_TYPE, "unknown");
-    //     int radioType;
-    //     if (radioString.equals("GPRS"))
-    //     {
-    //         radioType = NETWORK_TYPE_GPRS;
-    //     }
-    //     else if (radioString.equals("EDGE"))
-    //     {
-    //         radioType = NETWORK_TYPE_EDGE;
-    //     }
-    //     else if (radioString.equals("UMTS"))
-    //     {
-    //         radioType = NETWORK_TYPE_UMTS;
-    //     }
-    //     else if (radioString.equals("HSDPA"))
-    //     {
-    //         radioType = NETWORK_TYPE_HSDPA;
-    //     }
-    //     else if (radioString.equals("HSUPA"))
-    //     {
-    //         radioType = NETWORK_TYPE_HSUPA;
-    //     }
-    //     else if (radioString.equals("HSPA"))
-    //     {
-    //         radioType = NETWORK_TYPE_HSPA;
-    //     }
-    //     else
-    //     {
-    //         radioType = NETWORK_TYPE_UNKNOWN;
-    //     }
+    for (int i = 0; i < num; i++)
+    {
+        rssi = p.readInt32();
+        location = p.readString();
+        response.emplace_back(RIL_NeighboringCell{location.c_str(), rssi});
+    }
 
-    //     // Interpret the location based on radio access type
-    //     if (radioType != NETWORK_TYPE_UNKNOWN)
-    //     {
-    //         for (int i = 0; i < num; i++)
-    //         {
-    //             rssi = p.readInt32();
-    //             location = p.readString();
-    //             cell = new NeighboringCellInfo(rssi, location, radioType);
-    //             response.add(cell);
-    //         }
-    //     }
+    if (resp)
+    {
+        resp->type = TYPE_STRUCT;
+        resp->response_data.array.num = num;
+        RIL_NeighboringCell *data = (RIL_NeighboringCell *)malloc(num * sizeof(RIL_NeighboringCell));
+        for (int i = 0; i < num; i++)
+        {
+            data[i].rssi = response[i].rssi;
+            data[i].cid = strdup(response[i].cid);
+        }
+    }
 }
 
-void responseGetPreferredNetworkType(Parcel &p)
+void responseGetPreferredNetworkType(Parcel &p, RILResponse *resp)
 {
     //     int[] response = (int[])responseInts(p);
 
@@ -595,7 +591,7 @@ void responseGetPreferredNetworkType(Parcel &p)
     //     return response;
 }
 
-void responseGmsBroadcastConfig(Parcel &p)
+void responseGmsBroadcastConfig(Parcel &p, RILResponse *resp)
 {
     //     int num;
     //     ArrayList<SmsBroadcastConfigInfo> response;
@@ -618,7 +614,7 @@ void responseGmsBroadcastConfig(Parcel &p)
     //     }
 }
 
-void responseCdmaBroadcastConfig(Parcel &p)
+void responseCdmaBroadcastConfig(Parcel &p, RILResponse *resp)
 {
     //     int numServiceCategories;
     //     int response[];
@@ -660,20 +656,23 @@ void responseCdmaBroadcastConfig(Parcel &p)
     //     }
 }
 
-void responseSignalStrength(Parcel &p)
+void responseSignalStrength(Parcel &p, RILResponse *resp)
 {
-    int numInts = 12;
-    // mRespType = RESP_INT_ARR;
-
+    int numInts = 0;
     // /* TODO: Add SignalStrength class to match RIL_SignalStrength */
     // for (int i = 0; i < numInts; i++)
     // {
     //     mRespVecInt.emplace_back(p.readInt32());
-    //     LOGI << mRespVecInt[i] << ENDL;
+    //     LOGD << mRespVecInt[i] << ENDL;
     // }
+
+    if (resp)
+    {
+        resp->type = TYPE_STRUCT;
+    }
 }
 
-void responseCdmaInformationRecord(Parcel &p)
+void responseCdmaInformationRecord(Parcel &p, RILResponse *resp)
 {
     //     int numberOfInfoRecs;
     //     ArrayList<CdmaInformationRecords> response;
@@ -692,7 +691,7 @@ void responseCdmaInformationRecord(Parcel &p)
     //     }
 }
 
-void responseCdmaCallWaiting(Parcel &p)
+void responseCdmaCallWaiting(Parcel &p, RILResponse *resp)
 {
     //     CdmaCallWaitingNotification notification = new CdmaCallWaitingNotification();
 
@@ -708,7 +707,7 @@ void responseCdmaCallWaiting(Parcel &p)
     //     notification.numberPlan = p.readInt32();
 }
 
-void responseCallRing(Parcel &p)
+void responseCallRing(Parcel &p, RILResponse *resp)
 {
     //     char response[] = new char[4];
 

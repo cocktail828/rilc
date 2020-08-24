@@ -821,7 +821,7 @@ typedef struct
 
 typedef struct
 {
-    char *cid; /* Combination of LAC and Cell Id in 32 bits in GSM.
+    const char *cid; /* Combination of LAC and Cell Id in 32 bits in GSM.
                         * Upper 16 bits is LAC and lower 16 bits
                         * is CID (as described in TS 27.005)
                         * Primary Scrambling Code (as described in TS 25.331)

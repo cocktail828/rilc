@@ -13,13 +13,15 @@ class IObserver
 protected:
     std::mutex mLock;
     std::condition_variable mCond;
+    bool mAttachState;
 
 public:
-    IObserver() {}
+    IObserver() : mAttachState(false) {}
     virtual ~IObserver() {}
     virtual void update(Parcel &p) = 0;
     virtual int getRequestId() = 0;
     virtual int getCommandId() = 0;
+    void setAttachState(bool state) { mAttachState = state; }
 };
 
 // TODO, distinguish sync/async requests
@@ -35,6 +37,7 @@ public:
     {
         std::lock_guard<std::mutex> _lk(mListLock);
         mObservers.emplace_back(o);
+        o->setAttachState(true);
         LOGD << "attach new observer(" + std::to_string(mObservers.size()) + ") sn "
              << o->getRequestId() << " cid "
              << o->getCommandId()
@@ -49,6 +52,7 @@ public:
             if ((*iter) == o)
             {
                 mObservers.erase(iter);
+                o->setAttachState(false);
                 LOGD << "detach observer(" + std::to_string(mObservers.size()) + ") sn "
                      << o->getRequestId()
                      << " cid " << o->getCommandId()
@@ -72,6 +76,7 @@ public:
             Parcel p;
             LOGD << "removing observer: sn " << o->getRequestId() << ENDL;
             o->update(p);
+            o->setAttachState(false);
         }
 
         mObservers.clear();
@@ -88,10 +93,11 @@ public:
             IObserver *o = *iter;
             if (o->getRequestId() == rid)
             {
-                mObservers.erase(iter);
                 LOGD << "detach observer(" + std::to_string(mObservers.size()) + ") sn "
                      << o->getRequestId()
                      << " cid " << o->getCommandId() << ENDL;
+                mObservers.erase(iter);
+                o->setAttachState(false);
                 o->update(p);
                 break;
             }
