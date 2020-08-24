@@ -102,21 +102,21 @@ int main(int argc, char **argv)
     else
         RILC_init("/dev/ttyUSB4");
 
-    RILC_resister_unsocilited();
+    // RILC_resister_unsocilited();
 
     /* get imei */
     RILC_DO_COMMAND(RILC_getIMEI);
 
     /* get imsi */
-    // RILC_DO_COMMAND(RILC_getIMSI);
+    RILC_DO_COMMAND(RILC_getIMSI);
 
-    // RILC_DO_COMMAND(RILC_getVoiceRegistrationState);
+    RILC_DO_COMMAND(RILC_getVoiceRegistrationState);
 
-    // RILC_DO_COMMAND(RILC_getDataRegistrationState);
+    RILC_DO_COMMAND(RILC_getDataRegistrationState);
 
-    // RILC_DO_COMMAND(RILC_getOperator);
+    RILC_DO_COMMAND(RILC_getOperator);
 
-    // RILC_DO_COMMAND(RILC_getNeighboringCids);
+    RILC_DO_COMMAND(RILC_getNeighboringCids);
 
     RILC_uninit();
 

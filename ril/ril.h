@@ -525,7 +525,7 @@ typedef struct
     RIL_UUS_Type uusType; /* UUS Type */
     RIL_UUS_DCS uusDcs;   /* UUS Data Coding Scheme */
     int uusLength;        /* Length of UUS Data */
-    char *uusData;        /* UUS Data */
+    const char *uusData;  /* UUS Data */
 } RIL_UUS_Info;
 
 /* CDMA Signal Information Record as defined in C.S0005 section 3.7.5.5 */
@@ -548,9 +548,9 @@ typedef struct
                                    (0 = line 1) */
     char isVoice;           /* nonzero if this is is a voice call */
     char isVoicePrivacy;    /* nonzero if CDMA voice privacy mode is active */
-    char *number;           /* Remote party number */
+    const char *number;     /* Remote party number */
     int numberPresentation; /* 0=Allowed, 1=Restricted, 2=Not Specified/Unknown 3=Payphone */
-    char *name;             /* Remote party name */
+    const char *name;       /* Remote party name */
     int namePresentation;   /* 0=Allowed, 1=Restricted, 2=Not Specified/Unknown 3=Payphone */
     RIL_UUS_Info *uusInfo;  /* NULL or Pointer to User-User Signaling Information */
 } RIL_Call;
@@ -614,25 +614,25 @@ typedef struct
                                            The value of INT_MAX(0x7fffffff) means no retry. */
     int cid;                /* Context ID, uniquely identifies this call */
     int active;             /* 0=inactive, 1=active/physical link down, 2=active/physical link up */
-    char *type;             /* One of the PDP_type values in TS 27.007 section 10.1.1.
+    const char *type;       /* One of the PDP_type values in TS 27.007 section 10.1.1.
                                    For example, "IP", "IPV6", "IPV4V6", or "PPP". If status is
                                    PDP_FAIL_ONLY_SINGLE_BEARER_ALLOWED this is the type supported
                                    such as "IP" or "IPV6" */
-    char *ifname;           /* The network interface name */
-    char *addresses;        /* A space-delimited list of addresses with optional "/" prefix length,
+    const char *ifname;     /* The network interface name */
+    const char *addresses;  /* A space-delimited list of addresses with optional "/" prefix length,
                                    e.g., "192.0.1.3" or "192.0.1.11/16 2001:db8::1/64".
                                    May not be empty, typically 1 IPv4 or 1 IPv6 or
                                    one of each. If the prefix length is absent the addresses
                                    are assumed to be point to point with IPv4 having a prefix
                                    length of 32 and IPv6 128. */
-    char *dnses;            /* A space-delimited list of DNS server addresses,
+    const char *dnses;      /* A space-delimited list of DNS server addresses,
                                    e.g., "192.0.1.3" or "192.0.1.11 2001:db8::1".
                                    May be empty. */
-    char *gateways;         /* A space-delimited list of default gateway addresses,
+    const char *gateways;   /* A space-delimited list of default gateway addresses,
                                    e.g., "192.0.1.3" or "192.0.1.11 2001:db8::1".
                                    May be empty in which case the addresses represent point
                                    to point connections. */
-    char *pcscf;            /* the Proxy Call State Control Function address
+    const char *pcscf;      /* the Proxy Call State Control Function address
                                  via PCO(Protocol Configuration Option) for IMS client. */
 } RIL_Data_Call_Response_v9;
 
@@ -700,11 +700,11 @@ typedef struct
 
 typedef struct
 {
-    int messageRef; /* TP-Message-Reference for GSM,
+    int messageRef;     /* TP-Message-Reference for GSM,
                          and BearerData MessageId for CDMA
                          (See 3GPP2 C.S0015-B, v2.0, table 4.5-1). */
-    char *ackPDU;   /* or NULL if n/a */
-    int errorCode;  /* See 3GPP 27.005, 3.2.5 for GSM/UMTS,
+    const char *ackPDU; /* or NULL if n/a */
+    int errorCode;      /* See 3GPP 27.005, 3.2.5 for GSM/UMTS,
                          3GPP2 N.S0005 (IS-41C) Table 171 for CDMA,
                          -1 if unknown or not applicable*/
 } RIL_SMS_Response;
@@ -788,7 +788,7 @@ typedef struct
 {
     int sw1;
     int sw2;
-    char *simResponse; /* In hex string format ([a-fA-F0-9]*), except for SIM_AUTHENTICATION
+    const char *simResponse; /* In hex string format ([a-fA-F0-9]*), except for SIM_AUTHENTICATION
                            response for which it is in Base64 format, see 3GPP TS 31.102 7.1.2 */
 } RIL_SIM_IO_Response;
 
@@ -828,7 +828,7 @@ typedef struct
                         *         in 9 bits in UMTS
                         * Valid values are hexadecimal 0x0000 - 0xffffffff.
                         */
-    int rssi;  /* Received RSSI in GSM,
+    int rssi;        /* Received RSSI in GSM,
                         * Level index of CPICH Received Signal Code Power in UMTS
                         */
 } RIL_NeighboringCell;
@@ -1061,7 +1061,7 @@ typedef struct
                                    "code2" for MT. */
     int index;            /* CUG index. See 27.007 7.17. */
     int type;             /* "type" from 27.007 7.17 (MT only). */
-    char *number;         /* "number" from 27.007 7.17
+    const char *number;   /* "number" from 27.007 7.17
                                    (MT only, may be NULL). */
 } RIL_SuppSvcNotification;
 
@@ -1144,9 +1144,9 @@ typedef struct
     RIL_AppState app_state;
     RIL_PersoSubstate perso_substate; /* applicable only if app_state ==
                                        RIL_APPSTATE_SUBSCRIPTION_PERSO */
-    char *aid_ptr;                    /* null terminated string, e.g., from 0xA0, 0x00 -> 0x41,
+    const char *aid_ptr;              /* null terminated string, e.g., from 0xA0, 0x00 -> 0x41,
                                        0x30, 0x30, 0x30 */
-    char *app_label_ptr;              /* null terminated string */
+    const char *app_label_ptr;        /* null terminated string */
     int pin1_replaced;                /* applicable to USIM, CSIM & ISIM */
     RIL_PinState pin1;
     RIL_PinState pin2;

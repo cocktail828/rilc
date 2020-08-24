@@ -2416,8 +2416,8 @@ void RILRequest::processUnsolicited(Parcel &p)
 {
     int cmdid = p.readInt32();
 
-    mResponse->error_code = FIELD_INVALID;
-    mResponse->is_unsocilited = 1;
+    // mUnsocilitedResponse.error_code = FIELD_INVALID;
+    // mUnsocilitedResponse.is_unsocilited = 1;
 
     LOGI << "RESP < " << responseToString(cmdid) << ENDL;
     // either command succeeds or command fails but with data payload

@@ -5,6 +5,7 @@
 
 typedef enum
 {
+    TYPE_INVALID = 0,
     TYPE_STRING,
     TYPE_STRING_ARR,
     TYPE_INT,
