@@ -46,6 +46,7 @@ typedef enum
 typedef enum
 {
     TYPE_INVALID = 0,
+    TYPE_VOID,
     TYPE_STRING,
     TYPE_STRING_ARR,
     TYPE_INT,

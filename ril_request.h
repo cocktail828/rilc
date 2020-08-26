@@ -252,12 +252,11 @@ public:
 
     int sendUSSD(std::string ussdString);
 
-    // inherited javadoc suffices
     int cancelPendingUssd();
 
     int resetRadio();
 
-    // int invokeOemRILRequestRaw(uint8_t *data);
+    int invokeOemRILRequestRaw(uint8_t *data);
 
     int invokeOemRILRequestStrings(std::vector<std::string> strings);
 

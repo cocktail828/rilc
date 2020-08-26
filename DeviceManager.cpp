@@ -119,6 +119,7 @@ void pollingRead(DeviceManager *args)
 quit_polling:
     epoll_ctl(epfd, EPOLL_CTL_DEL, args->mPollingHandle, &event);
     close(epfd);
+    close(args->mPollingHandle);
     LOGW << "polling thread quit polling" << ENDL;
     args->mReady = false;
     args->processResponse(nullptr, 0);
@@ -240,14 +241,14 @@ bool DeviceManager::closeDevice()
 
 static void dump_msg(const void *data, int len, const char *direction)
 {
-    static char _msg[16 * 1024];
-    memset(_msg, 0, sizeof(_msg));
+    // static char _msg[16 * 1024];
+    // memset(_msg, 0, sizeof(_msg));
 
-    const uint8_t *ptr = reinterpret_cast<const uint8_t *>(data);
-    for (int i = 0; i < len; i++)
-        snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
+    // const uint8_t *ptr = reinterpret_cast<const uint8_t *>(data);
+    // for (int i = 0; i < len; i++)
+    //     snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
 
-    LOGD << "(" + std::to_string(len) + "): " + direction + " " << _msg << ENDL;
+    // LOGD << "(" + std::to_string(len) + "): " + direction + " " << _msg << ENDL;
 }
 
 int DeviceManager::sendAsync(const void *data, int len)
@@ -259,7 +260,12 @@ int DeviceManager::sendAsync(const void *data, int len)
 
     dump_msg(data, len, ">>>>>>");
 
-    ssize_t ret = write(mPollingHandle, data, len);
+    ssize_t ret;
+    do
+    {
+        ret = write(mPollingHandle, data, len);
+    } while (ret < 0 && (errno == EINTR || errno == EAGAIN));
+
     if (ret < 0)
     {
         LOGE << "send message failed" << ENDL;
@@ -277,7 +283,12 @@ int DeviceManager::recvAsync(void *data, int len, int *olen)
     if (!mReady)
         return false;
 
-    ssize_t ret = read(mPollingHandle, data, len);
+    ssize_t ret;
+    do
+    {
+        ret = read(mPollingHandle, data, len);
+    } while (ret < 0 && (errno == EINTR || errno == EAGAIN));
+
     if (ret < 0)
     {
         LOGE << "recv message failed" << ENDL;

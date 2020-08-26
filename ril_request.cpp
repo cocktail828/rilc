@@ -533,11 +533,10 @@ void RILRequest::obtain(int cid)
     /**
      * no phone ID on android
      */
-    // /* marshal phone id */
-    // if (mCommandId == RIL_REQUEST_OEM_HOOK_STRINGS ||
-    //     mCommandId == RIL_REQUEST_SETUP_DATA_CALL ||
-    //     mCommandId == RIL_REQUEST_DEACTIVATE_DATA_CALL)
+#ifndef __ANDROID__
+    /* marshal phone id */
     mParcel.writeInt32(0);
+#endif
 }
 
 /**
@@ -1886,17 +1885,18 @@ int RILRequest::resetRadio()
     return ret ? 0 : -1;
 }
 
-// int RILRequest::invokeOemRilRequestRaw(uint8_t *data)
-// {
-//     obtain(//               RIL_REQUEST_OEM_HOOK_RAW,
-//               result);
+int RILRequest::invokeOemRILRequestRaw(uint8_t *data)
+{
+    // obtain(RIL_REQUEST_OEM_HOOK_RAW);
 
-//     LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << "[" + IccUtils.bytesToHexString(data) + "]" << ENDL;
+    // LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-//     mParcel.writeByteAthisay(data);
-//     if (!nonblockSend(this)){
-//     mResponse = result;
-// }
+    // int ret = nonblockSend(this);
+    // if (!ret)
+    //     LOGE << "send request failed" << ENDL;
+    // return ret ? 0 : -1;
+    return 0;
+}
 
 int RILRequest::invokeOemRILRequestStrings(std::vector<std::string> strings)
 {
@@ -2158,21 +2158,20 @@ int RILRequest::getGsmBroadcastConfig()
 //     mResponse = result;
 // }
 
-// int RILRequest::setGsmBroadcastActivation(bool activate)
-// {
-//     obtain(RIL_REQUEST_GSM_BROADCAST_ACTIVATION);
+int RILRequest::setGsmBroadcastActivation(bool activate)
+{
+    obtain(RIL_REQUEST_GSM_SMS_BROADCAST_ACTIVATION);
 
-//     mParcel.writeInt32(1);
-//     mParcel.writeInt32(activate ? 0 : 1);
+    mParcel.writeInt32(1);
+    mParcel.writeInt32(activate ? 0 : 1);
 
-//     LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
 
-//     if (!nonblockSend(this))
-//     {
-//         LOGE << "send request failed" << ENDL;
-//         return;
-//     }
-// }
+    int ret = nonblockSend(this);
+    if (!ret)
+        LOGE << "send request failed" << ENDL;
+    return ret ? 0 : -1;
+}
 
 // //***** Private Methods
 // private
@@ -2423,7 +2422,7 @@ void RILRequest::processUnsolicited(Parcel &p)
     auto processer = UnsocilitedProcesser.find(cmdid);
     if (processer != UnsocilitedProcesser.end())
     {
-        processer->second(p, nullptr);
+        // processer->second(p, nullptr);
     }
     else
     {

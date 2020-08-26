@@ -4,7 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:= \
     DeviceManager.cpp \
     logger.cpp \
-    main.cpp \
+    rilc_test.cpp \
     rilc_api.cpp \
     ril_request.cpp \
     ril_response.cpp \
