@@ -12,6 +12,9 @@
 
 std::string responseToString(int respid);
 
+void set_ril_version(int ver);
+int get_ril_version();
+
 void responseStrings(Parcel &p, RILResponse *resp);
 void responseStringsShow(RILResponse *resp);
 void responseStringsFree(RILResponse *resp);

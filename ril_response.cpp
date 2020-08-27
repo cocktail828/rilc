@@ -16,9 +16,23 @@
     do                                       \
     {                                        \
         if (!v)                              \
+        {                                    \
             LOGE << "out of memory" << ENDL; \
-        return;                              \
+            return;                          \
+        }                                    \
     } while (0);
+
+static int ril_version = 0;
+
+void set_ril_version(int ver)
+{
+    ril_version = ver;
+}
+
+int get_ril_version()
+{
+    return ril_version;
+}
 
 void responseStrings(Parcel &p, RILResponse *resp)
 {
@@ -45,7 +59,7 @@ void responseStringsShow(RILResponse *resp)
     LOGI << "UNMARSHAL: num of string " << num << ENDL;
     const char **data = (const char **)resp->responseData.array.data;
     for (int i = 0; i < num; i++)
-        LOGI << data[i] << " " << ENDL;
+        LOGI << NULLSTR(data[i]) << " " << ENDL;
 }
 
 void responseStringsFree(RILResponse *resp)
@@ -70,12 +84,11 @@ void responseStringShow(RILResponse *resp)
 {
     if (!resp)
         return;
-    LOGI << "UNMARSHAL: " << resp->responseData.value_string << ENDL;
+    LOGI << "UNMARSHAL: " << NULLSTR(resp->responseData.value_string) << ENDL;
 }
 
 void responseStringFree(RILResponse *resp)
 {
-    LOGI << __LINE__ << ENDL;
     if (!resp)
         return;
     SAFETYFREE(resp->responseData.value_string);
@@ -83,11 +96,9 @@ void responseStringFree(RILResponse *resp)
 
 void responseInts(Parcel &p, RILResponse *resp)
 {
-    LOGI << __LINE__ << ENDL;
     if (!resp)
         return;
 
-    LOGI << __LINE__ << ENDL;
     int num = p.readInt32();
     int *data = (int *)malloc(num * sizeof(int));
     ERROR_MALLOC0(data);
@@ -101,10 +112,8 @@ void responseInts(Parcel &p, RILResponse *resp)
 
 void responseIntsShow(RILResponse *resp)
 {
-    LOGI << __LINE__ << ENDL;
     if (!resp)
         return;
-    LOGI << __LINE__ << ENDL;
     LOGI << "UNMARSHAL: num of int = " << resp->responseData.array.num;
     int *data = (int *)resp->responseData.array.data;
     for (int i = 0; i < resp->responseData.array.num; i++)
@@ -544,7 +553,7 @@ void responseIccCardStatus(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
 
-    RIL_CardStatus_v6 *response = (RIL_CardStatus_v6 *)malloc(sizeof(sizeof(RIL_CardStatus_v6)));
+    RIL_CardStatus_v6 *response = (RIL_CardStatus_v6 *)malloc(sizeof(RIL_CardStatus_v6));
     ERROR_MALLOC0(response);
 
     response->card_state = static_cast<RIL_CardState>(p.readInt32());
@@ -576,7 +585,7 @@ void responseIccCardStatusShow(RILResponse *resp)
         return;
 
     RIL_CardStatus_v6 *response = (RIL_CardStatus_v6 *)resp->responseData.array.data;
-    LOGI << "UNMARSHALL: num of struct = " << response->num_applications << ENDL;
+    LOGI << "UNMARSHALL" << ENDL;
     LOGI << "  response->card_state = " << response->card_state << ENDL;
     LOGI << "  response->universal_pin_state = " << response->universal_pin_state << ENDL;
     LOGI << "  response->gsm_umts_subscription_app_index = " << response->gsm_umts_subscription_app_index << ENDL;
@@ -828,6 +837,7 @@ void responseDataCallListFree(RILResponse *resp)
         SAFETYFREE(response[i].gateways);
         SAFETYFREE(response[i].pcscf);
     }
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseSetupDataCall(Parcel &p, RILResponse *resp)
@@ -1004,7 +1014,6 @@ void responseSignalStrength(Parcel &p, RILResponse *resp)
 {
     if (!resp)
         return;
-
     RIL_SignalStrength_v10 *response = (RIL_SignalStrength_v10 *)malloc(sizeof(RIL_SignalStrength_v10));
     ERROR_MALLOC0(response);
     response->GW_SignalStrength.signalStrength = p.readInt32();
@@ -1017,8 +1026,12 @@ void responseSignalStrength(Parcel &p, RILResponse *resp)
     response->LTE_SignalStrength.signalStrength = p.readInt32();
     response->LTE_SignalStrength.rsrp = p.readInt32();
     response->LTE_SignalStrength.rsrq = p.readInt32();
+    response->LTE_SignalStrength.rssnr = p.readInt32();
     response->LTE_SignalStrength.cqi = p.readInt32();
     response->TD_SCDMA_SignalStrength.rscp = p.readInt32();
+#ifdef ORCA_FEATURE_5G
+    RIL_NR_SignalStrength NR_SignalStrength;
+#endif
 
     resp->responseType = TYPE_STRUCT;
     resp->responseData.array.num = 1;
@@ -1029,9 +1042,9 @@ void responseSignalStrengthShow(RILResponse *resp)
 {
     if (!resp)
         return;
-
     RIL_SignalStrength_v10 *response = (RIL_SignalStrength_v10 *)resp->responseData.array.data;
     LOGI << "UNMARSHALL:" << ENDL;
+    LOGI << __LINE__ << (response == nullptr) << ENDL;
     LOGI << "  GW_SignalStrength.signalStrength = " << response->GW_SignalStrength.signalStrength << ENDL;
     LOGI << "  GW_SignalStrength.bitErrorRate   = " << response->GW_SignalStrength.bitErrorRate << ENDL;
     LOGI << "  CDMA_SignalStrength.dbm          = " << response->CDMA_SignalStrength.dbm << ENDL;

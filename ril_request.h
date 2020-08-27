@@ -23,6 +23,7 @@ private:
     static int mGlobalRequestId;
     static bool mReady;
     static RILResponse mUnsocilitedResponse;
+    static int mRilVersion;
 
 public:
     static std::mutex mGlobalLock;

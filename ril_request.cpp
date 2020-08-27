@@ -17,6 +17,7 @@ int RILRequest::mGlobalRequestId = 0;
 bool RILRequest::mReady = false;
 std::mutex RILRequest::mGlobalLock;
 RILResponse RILRequest::mUnsocilitedResponse;
+int RILRequest::mRilVersion = 0;
 
 static std::string requestidToString(int id)
 {
@@ -2443,6 +2444,15 @@ void RILRequest::processUnsolicited(Parcel &p)
         {
             processer->second.responseParser(p, &resp);
             processer->second.callback(&resp);
+        }
+
+        if (cmdid == RIL_UNSOL_RIL_CONNECTED)
+        {
+            processer->second.responseParser(p, &resp);
+            int *data = (int *)resp.responseData.array.data;
+            mRilVersion = data[0];
+            set_ril_version(mRilVersion);
+            LOGI << "RILD version: " << mRilVersion << ENDL;
         }
     }
     else

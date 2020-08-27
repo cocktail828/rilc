@@ -60,42 +60,6 @@ static int sg_index = 0;
         LOGI << ">>>>>>>> RILC_TEST index: " << sg_index << " finished" << ENDL << ENDL << ENDL; \
     } while (0);
 
-/**
- * will call std::abort() if get the response returns with an error code or get timeout
- */
-#define RILC_TEST_ABORT_TIMEOUT_ERROR(func, args...)                                             \
-    do                                                                                           \
-    {                                                                                            \
-        LOGI << ">>>>>>>> RILC_TEST index: " << ++sg_index << ENDL;                              \
-        RILResponse resp;                                                                        \
-        memset(&resp, 0, sizeof(RILResponse));                                                   \
-        resp.responseNotify = socilited_notify;                                                  \
-        std::unique_lock<std::mutex> _lk(mutex);                                                 \
-        func(&resp, ##args);                                                                     \
-        if (cond.wait_for(_lk, std::chrono::seconds(60)) == std::cv_status::timeout)             \
-        {                                                                                        \
-            LOGI << ">>>>>>>> index: " << sg_index << " failed for timeout" << ENDL;             \
-            LOGE << "OOPS!!! request timeout" << ENDL;                                           \
-            LOGE << "check wether host can get response from device" << ENDL;                    \
-            std::abort();                                                                        \
-        }                                                                                        \
-        else                                                                                     \
-        {                                                                                        \
-            LOGI << ">>>>>>>> RILC_TEST index: " << sg_index << " get response " << ENDL;        \
-            if (resp.errorCode)                                                                  \
-            {                                                                                    \
-                LOGI << ">>>>>>>> RILC_TEST index: " << sg_index << " get an error" << ENDL;     \
-                std::abort();                                                                    \
-            }                                                                                    \
-            if (resp.responseShow)                                                               \
-                resp.responseShow(&resp);                                                        \
-            if (resp.responseFree)                                                               \
-                resp.responseFree(&resp);                                                        \
-        }                                                                                        \
-        _lk.unlock();                                                                            \
-        LOGI << ">>>>>>>> RILC_TEST index: " << sg_index << " finished" << ENDL << ENDL << ENDL; \
-    } while (0);
-
 int main(int argc, char **argv)
 {
     static const struct option long_options[] = {
@@ -201,28 +165,28 @@ int main(int argc, char **argv)
             RILC_init("/dev/ttyUSB4");
     }
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_getIMEI);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_getIMEI);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_getIMEISV);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_getIMEISV);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_getIMSI);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_getIMSI);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_getVoiceRegistrationState);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_getVoiceRegistrationState);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_getDataRegistrationState);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_getDataRegistrationState);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_getOperator);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_getOperator);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_getNeighboringCids);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_getNeighboringCids);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_getSignalStrength);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_getSignalStrength);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_getPreferredNetworkType);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_getPreferredNetworkType);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_setPreferredNetworkType, RADIO_TECHNOLOGY_LTE);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_setPreferredNetworkType, RADIO_TECHNOLOGY_LTE);
 
-    RILC_TEST_ABORT_TIMEOUT(RILC_setupDataCall, RADIO_TECHNOLOGY_LTE, "0", "3gnet",
-                            "", "", SETUP_DATA_AUTH_NONE, PROTOCOL_IPV4);
+    // RILC_TEST_ABORT_TIMEOUT(RILC_setupDataCall, RADIO_TECHNOLOGY_LTE, "0", "3gnet",
+    //                         "", "", SETUP_DATA_AUTH_NONE, PROTOCOL_IPV4);
 
     RILC_TEST_ABORT_TIMEOUT(RILC_getIccCardStatus);
 

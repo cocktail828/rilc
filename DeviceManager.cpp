@@ -339,6 +339,7 @@ void DeviceManager::processResponse(void *data, size_t len)
     {
         LOGD << "polling thread may quit" << ENDL;
         mQuitFlag = true;
+        detachAll();
         return;
     }
 
