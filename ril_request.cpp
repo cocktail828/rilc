@@ -2389,12 +2389,15 @@ void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
     else
         LOGI << "RESP < " << commandidToString(rr->getCommandId()) << ENDL;
 
-    rr->mResponse->commandId = rr->getCommandId();
-    rr->mResponse->errorCode = error;
-    rr->mResponse->isUnsocilited = 0;
-    rr->mResponse->responseShow = nullptr;
-    rr->mResponse->responseFree = nullptr;
-    clock_gettime(CLOCK_MONOTONIC, &rr->mResponse->finishTime);
+    if（rr->mResponse)
+    {
+        rr->mResponse->commandId = rr->getCommandId();
+        rr->mResponse->errorCode = error;
+        rr->mResponse->isUnsocilited = 0;
+        rr->mResponse->responseShow = nullptr;
+        rr->mResponse->responseFree = nullptr;
+        clock_gettime(CLOCK_MONOTONIC, &rr->mResponse->finishTime);
+    }
 
     if (error == 0 || p.dataAvail() > 0)
     {
@@ -2402,8 +2405,11 @@ void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
         auto processer = SocilitedResponseProcesser.find(rr->getCommandId());
         if (processer != SocilitedResponseProcesser.end())
         {
-            rr->mResponse->responseFree = processer->second.responseFree;
-            rr->mResponse->responseShow = processer->second.responseShow;
+            if (rr->mResponse)
+            {
+                rr->mResponse->responseFree = processer->second.responseFree;
+                rr->mResponse->responseShow = processer->second.responseShow;
+            }
             processer->second.responseParser(p, rr->mResponse);
         }
         else
