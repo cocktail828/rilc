@@ -13,6 +13,7 @@
 #define __attribute_deprecated__ __attribute__((deprecated))
 #endif
 
+std::string commandidToString(int cid);
 #define RIL_MAX_BUFSIZE (1024 * 8)
 class RILRequest final : public IObserver
 {
@@ -33,6 +34,9 @@ private:
     /* instance variables */
     std::mutex mRequestLock;
     std::condition_variable mRequestCond;
+
+    /* indicate the request type is sync or async */
+    bool mSyncReq;
 
     /* transication id, increasing */
     int mRequestId;

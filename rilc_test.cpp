@@ -16,7 +16,7 @@
 std::mutex mutex;
 std::condition_variable cond;
 
-void socilited_notify(void *arg)
+void socilited_notify(RILResponse *arg)
 {
     cond.notify_one();
     LOGI << "RILC call user defined socilited_notify function" << ENDL;
@@ -38,7 +38,7 @@ static int sg_index = 0;
         LOGI << ">>>>>>>> RILC_TEST index: " << ++sg_index << ENDL;                              \
         RILResponse resp;                                                                        \
         memset(&resp, 0, sizeof(RILResponse));                                                   \
-        resp.notify = socilited_notify;                                                          \
+        resp.responseNotify = socilited_notify;                                                  \
         std::unique_lock<std::mutex> _lk(mutex);                                                 \
         func(&resp, ##args);                                                                     \
         if (cond.wait_for(_lk, std::chrono::seconds(60)) == std::cv_status::timeout)             \
@@ -50,6 +50,10 @@ static int sg_index = 0;
         }                                                                                        \
         else                                                                                     \
         {                                                                                        \
+            if (resp.responseShow)                                                               \
+                resp.responseShow(&resp);                                                        \
+            if (resp.responseFree)                                                               \
+                resp.responseFree(&resp);                                                        \
             LOGI << ">>>>>>>> RILC_TEST index: " << sg_index << " pass" << ENDL;                 \
         }                                                                                        \
         _lk.unlock();                                                                            \
@@ -65,7 +69,7 @@ static int sg_index = 0;
         LOGI << ">>>>>>>> RILC_TEST index: " << ++sg_index << ENDL;                              \
         RILResponse resp;                                                                        \
         memset(&resp, 0, sizeof(RILResponse));                                                   \
-        resp.notify = socilited_notify;                                                          \
+        resp.responseNotify = socilited_notify;                                                  \
         std::unique_lock<std::mutex> _lk(mutex);                                                 \
         func(&resp, ##args);                                                                     \
         if (cond.wait_for(_lk, std::chrono::seconds(60)) == std::cv_status::timeout)             \
@@ -78,11 +82,15 @@ static int sg_index = 0;
         else                                                                                     \
         {                                                                                        \
             LOGI << ">>>>>>>> RILC_TEST index: " << sg_index << " get response " << ENDL;        \
-            if (resp.error_code)                                                                 \
+            if (resp.errorCode)                                                                  \
             {                                                                                    \
                 LOGI << ">>>>>>>> RILC_TEST index: " << sg_index << " get an error" << ENDL;     \
                 std::abort();                                                                    \
             }                                                                                    \
+            if (resp.responseShow)                                                               \
+                resp.responseShow(&resp);                                                        \
+            if (resp.responseFree)                                                               \
+                resp.responseFree(&resp);                                                        \
         }                                                                                        \
         _lk.unlock();                                                                            \
         LOGI << ">>>>>>>> RILC_TEST index: " << sg_index << " finished" << ENDL << ENDL << ENDL; \

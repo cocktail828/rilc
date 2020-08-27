@@ -23,7 +23,7 @@ static std::string requestidToString(int id)
     return std::to_string(id);
 }
 
-static std::string commandidToString(int cid)
+std::string commandidToString(int cid)
 {
     switch (cid)
     {
@@ -496,12 +496,14 @@ static std::string commandidToString(int cid)
 
 RILRequest::RILRequest(RILResponse *resp)
     : IObserver(),
+      mSyncReq(false),
       mRequestId(0),
       mCommandId(0),
       mResponse(resp) {}
 
 RILRequest::RILRequest()
     : IObserver(),
+      mSyncReq(false),
       mRequestId(0),
       mCommandId(0),
       mResponse(nullptr) {}
@@ -2386,18 +2388,22 @@ void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
     else
         LOGI << "RESP < " << commandidToString(rr->getCommandId()) << ENDL;
 
-    rr->mResponse->command_id = rr->getCommandId();
-    rr->mResponse->error_code = error;
-    rr->mResponse->is_unsocilited = 0;
-    clock_gettime(CLOCK_MONOTONIC, &rr->mResponse->finish_time);
+    rr->mResponse->commandId = rr->getCommandId();
+    rr->mResponse->errorCode = error;
+    rr->mResponse->isUnsocilited = 0;
+    rr->mResponse->responseShow = nullptr;
+    rr->mResponse->responseFree = nullptr;
+    clock_gettime(CLOCK_MONOTONIC, &rr->mResponse->finishTime);
 
     if (error == 0 || p.dataAvail() > 0)
     {
         // either command succeeds or command fails but with data payload
-        auto processer = SocilitedProcesser.find(rr->getCommandId());
-        if (processer != SocilitedProcesser.end())
+        auto processer = SocilitedResponseProcesser.find(rr->getCommandId());
+        if (processer != SocilitedResponseProcesser.end())
         {
-            processer->second(p, rr->mResponse);
+            rr->mResponse->responseFree = processer->second.responseFree;
+            rr->mResponse->responseShow = processer->second.responseShow;
+            processer->second.responseParser(p, rr->mResponse);
         }
         else
         {
@@ -2406,7 +2412,7 @@ void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
     }
 
     // notice caller immediatelly
-    rr->mResponse->notify(rr->mResponse->userdata);
+    rr->mResponse->responseNotify(rr->mResponse);
     delete rr;
 }
 
@@ -2417,12 +2423,27 @@ void RILRequest::processUnsolicited(Parcel &p)
     // mUnsocilitedResponse.error_code = FIELD_INVALID;
     // mUnsocilitedResponse.is_unsocilited = 1;
 
+    RILResponse resp;
+    memset(&resp, 0, sizeof(RILResponse));
+
+    resp.commandId = cmdid;
+    resp.isUnsocilited = 1;
+    resp.responseShow = nullptr;
+    resp.responseFree = nullptr;
+    clock_gettime(CLOCK_MONOTONIC, &resp.startTime);
     LOGI << "RESP < " << responseToString(cmdid) << ENDL;
+
     // either command succeeds or command fails but with data payload
-    auto processer = UnsocilitedProcesser.find(cmdid);
-    if (processer != UnsocilitedProcesser.end())
+    auto processer = UnSocilitedResponseProcesser.find(cmdid);
+    if (processer != UnSocilitedResponseProcesser.end())
     {
-        // processer->second(p, nullptr);
+        resp.responseFree = processer->second.responseFree;
+        resp.responseShow = processer->second.responseShow;
+        if (processer->second.callback)
+        {
+            processer->second.responseParser(p, &resp);
+            processer->second.callback(&resp);
+        }
     }
     else
     {

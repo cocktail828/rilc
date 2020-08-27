@@ -47,6 +47,7 @@ typedef enum
 {
     TYPE_INVALID = 0,
     TYPE_VOID,
+    TYPE_RAWDATA,
     TYPE_STRING,
     TYPE_STRING_ARR,
     TYPE_INT,
@@ -60,68 +61,64 @@ typedef struct
     void *data;
 } data_array;
 
-typedef struct
+typedef struct _RILResponse
 {
     /**
-     * user data field, user can set the fileld as he will
-     * users should distinguish the request by himself
-     * value set by user
+     * user data field, user can set the fileld as he will. users should distinguish the request by himself
+     * -> value set by user
      */
     void *userdata;
-    /**
-     * an callback function, notify caller that rilc has finish the request
-     * NOTICE:
-     *      User should implement an mechenism of notification, by signal or lock, 
-     *      anyway, rilc not care, but it should work
-     * value set by user
-     */
-    typedef void notify_(void *);
-    notify_ *notify;
 
     /**
      * response data if have 
-     * value set by rilc
+     * -> value set by rilc
      */
     union
     {
         int value_int;
         const char *value_string;
         data_array array;
-    } response_data;
+    } responseData;
 
-    response_type type;
+    response_type responseType;
 
-    /**
-     * command id, or request id
-     */
-    int command_id;
+    /* command id, or request id */
+    int commandId;
 
     /**
-     * error code from rild, refer to rild for more details. notice, this field is valid only in unsocilited response
-     * value set by rilc
+     * error code from rild, refer to rild for more details. notice, this field is valid only in socilited response
+     * -> value set by rilc
      */
-    int error_code;
+    int errorCode;
 
     /**
      * the response is unsocilited response?
      * 0 for socilited response
      * 1 for unsocilited response
-     * value set by rilc
+     * -> value set by rilc
      */
-    int is_unsocilited;
+    int isUnsocilited;
 
-    /* request time, rilc will set the time 
-     * value set by rilc
-     */
-    struct timespec start_time;
+    /* request time or the time get unsocilited response, rilc will set the time
+     * -> value set by rilc */
+    struct timespec startTime;
+
+    /* request finish time, rilc will set the time when finish 
+     * -> value set by rilc */
+    struct timespec finishTime;
 
     /**
-     * request finish time, rilc will set the time when finish
-     * value set by rilc
+     * an callback function, the function will be called when rilc finish the request or get unsocilited response
+     * NOTICE:
+     *      User should implement an mechenism of notification, by signal or lock by himself, 
+     *      anyway, rilc does not care, but it should work.
+     * -> value set by user
      */
-    struct timespec finish_time;
-} RILResponse;
+    void (*responseNotify)(_RILResponse *);
 
-#define FIELD_INVALID -1
+    void (*responseShow)(_RILResponse *);
+
+    void (*responseFree)(_RILResponse *);
+} RILResponse;
 
 #endif //__RILC_INTERFACE

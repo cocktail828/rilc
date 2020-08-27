@@ -6,6 +6,7 @@
 #include <stdarg.h>
 
 #include "ril_request.h"
+#include "ril_response.h"
 #include "rilc_api.h"
 #include "logger.h"
 
@@ -13,7 +14,7 @@
 
 int RILC_init(const char *device)
 {
-    const int max_try = 30;
+    const int max_try = 10;
     int try_time;
 
     /* another thread is doing init? */
@@ -65,12 +66,41 @@ int RILC_uninit()
     return ret;
 }
 
-/********************************************************************************/
-/********************************************************************************/
+/**********************************************************************************/
+/************************** RILC UNSOCILITED PROCESSERS ***************************/
+/**********************************************************************************/
+void rilc_unsocilited_register(int cmdid, void (*cb)(RILResponse *))
+{
+    auto processer = UnSocilitedResponseProcesser.find(cmdid);
+    if (processer != UnSocilitedResponseProcesser.end())
+    {
+        processer->second.callback = cb;
+        LOGI << "register callback for unsocilited: "
+             << commandidToString(cmdid) << ENDL;
+    }
+    else
+    {
+        LOGE << "oops! cannot find handler for " << commandidToString(cmdid) << ENDL;
+    }
+}
+
+void rilc_unsocilited_deregister(int cmdid)
+{
+    auto processer = UnSocilitedResponseProcesser.find(cmdid);
+    if (processer != UnSocilitedResponseProcesser.end())
+    {
+        processer->second.callback = nullptr;
+        LOGI << "deregister callback for unsocilited: "
+             << commandidToString(cmdid) << ENDL;
+    }
+    else
+    {
+        LOGE << "oops! cannot find handler for " << commandidToString(cmdid) << ENDL;
+    }
+}
+
 /********************************************************************************/
 /************************** RILC STANDARD REQUESTS ******************************/
-/********************************************************************************/
-/********************************************************************************/
 /********************************************************************************/
 #define RILC_REQUEST_WITH_ARG(func, resp, arg, args...)                          \
     do                                                                           \
@@ -78,7 +108,7 @@ int RILC_uninit()
         if (!resp)                                                               \
             LOGW << __func__ << " is called without response parameter" << ENDL; \
         else                                                                     \
-            clock_gettime(CLOCK_MONOTONIC, &(resp->start_time));                 \
+            clock_gettime(CLOCK_MONOTONIC, &(resp->startTime));                  \
         RILRequest *req = new (std::nothrow) RILRequest(resp);                   \
         if (req->func(arg, ##args))                                              \
         {                                                                        \
@@ -94,7 +124,7 @@ int RILC_uninit()
         if (!resp)                                                               \
             LOGW << __func__ << " is called without response parameter" << ENDL; \
         else                                                                     \
-            clock_gettime(CLOCK_MONOTONIC, &(resp->start_time));                 \
+            clock_gettime(CLOCK_MONOTONIC, &(resp->startTime));                  \
         RILRequest *req = new (std::nothrow) RILRequest(resp);                   \
         if (req->func())                                                         \
         {                                                                        \

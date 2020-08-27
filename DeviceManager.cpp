@@ -241,14 +241,14 @@ bool DeviceManager::closeDevice()
 
 static void dump_msg(const void *data, int len, const char *direction)
 {
-    // static char _msg[16 * 1024];
-    // memset(_msg, 0, sizeof(_msg));
+    static char _msg[16 * 1024];
+    memset(_msg, 0, sizeof(_msg));
 
-    // const uint8_t *ptr = reinterpret_cast<const uint8_t *>(data);
-    // for (int i = 0; i < len; i++)
-    //     snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
+    const uint8_t *ptr = reinterpret_cast<const uint8_t *>(data);
+    for (int i = 0; i < len; i++)
+        snprintf(_msg + strlen(_msg), 8 * 1024, "%02x ", ptr[i]);
 
-    // LOGD << "(" + std::to_string(len) + "): " + direction + " " << _msg << ENDL;
+    LOGD << "(" + std::to_string(len) + "): " + direction + " " << _msg << ENDL;
 }
 
 int DeviceManager::sendAsync(const void *data, int len)

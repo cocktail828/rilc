@@ -3,83 +3,138 @@
 #include "ril_response.h"
 #include "logger.h"
 
-#define NULLSTR(s) (s == NULL ? "" : s)
+#define NULLSTR(s) (s == nullptr ? "" : s)
+#define SAFETYFREE(v)        \
+    do                       \
+    {                        \
+        if (v)               \
+            free((void *)v); \
+        v = nullptr;         \
+    } while (0)
+
+#define ERROR_MALLOC0(v)                     \
+    do                                       \
+    {                                        \
+        if (!v)                              \
+            LOGE << "out of memory" << ENDL; \
+        return;                              \
+    } while (0);
+
 void responseStrings(Parcel &p, RILResponse *resp)
 {
-    std::vector<std::string> response;
+    if (!resp)
+        return;
+
     int num = p.readInt32();
-
+    const char **data = (const char **)malloc(num * sizeof(char **));
+    ERROR_MALLOC0(data);
     for (int i = 0; i < num; i++)
-    {
-        auto str = p.readString();
-        response.emplace_back(NULLSTR(str));
-        p.freeString(str);
-    }
+        data[i] = p.readString();
 
-    if (resp)
-    {
-        char **data = (char **)malloc(num * sizeof(char **));
-        for (int i = 0; i < num; i++)
-            data[i] = strdup(response[i].c_str());
+    resp->responseType = TYPE_STRING_ARR;
+    resp->responseData.array.data = data;
+    resp->responseData.array.num = num;
+}
 
-        resp->type = TYPE_STRING_ARR;
-        resp->response_data.array.data = data;
-        resp->response_data.array.num = num;
-    }
+void responseStringsShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
 
-    LOGD << "UNMARSHAL: num of string " << num << ENDL;
-    for (auto i : response)
-        LOGD << i << " " << ENDL;
+    int num = resp->responseData.array.num;
+    LOGI << "UNMARSHAL: num of string " << num << ENDL;
+    const char **data = (const char **)resp->responseData.array.data;
+    for (int i = 0; i < num; i++)
+        LOGI << data[i] << " " << ENDL;
+}
+
+void responseStringsFree(RILResponse *resp)
+{
+    int num = resp->responseData.array.num;
+    const char **data = (const char **)resp->responseData.array.data;
+    for (int i = 0; i < num; i++)
+        SAFETYFREE(data[i]);
+    SAFETYFREE(data);
 }
 
 void responseString(Parcel &p, RILResponse *resp)
 {
-    const char *response = p.readString();
-    std::string mRespString = NULLSTR(response);
-    p.freeString(response);
+    if (!resp)
+        return;
 
-    if (resp)
-    {
-        resp->type = TYPE_STRING;
-        resp->response_data.value_string = strdup(mRespString.c_str());
-    }
-    LOGD << "UNMARSHAL: " << mRespString << ENDL;
+    resp->responseData.value_string = p.readString();
+    resp->responseType = TYPE_STRING;
+}
+
+void responseStringShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    LOGI << "UNMARSHAL: " << resp->responseData.value_string << ENDL;
+}
+
+void responseStringFree(RILResponse *resp)
+{
+    LOGI << __LINE__ << ENDL;
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.value_string);
 }
 
 void responseInts(Parcel &p, RILResponse *resp)
 {
-    std::vector<int> response;
+    LOGI << __LINE__ << ENDL;
+    if (!resp)
+        return;
+
+    LOGI << __LINE__ << ENDL;
     int num = p.readInt32();
-
+    int *data = (int *)malloc(num * sizeof(int));
+    ERROR_MALLOC0(data);
     for (int i = 0; i < num; i++)
-    {
-        int data = p.readInt32();
-        response.emplace_back(data);
-    }
+        data[i] = p.readInt32();
 
-    if (resp)
-    {
-        resp->type = TYPE_INT_ARR;
-        int *data = (int *)malloc(num * sizeof(int));
-        for (int i = 0; i < num; i++)
-            data[i] = response[i];
+    resp->responseType = TYPE_INT_ARR;
+    resp->responseData.array.data = data;
+    resp->responseData.array.num = num;
+}
 
-        resp->response_data.array.data = data;
-        resp->response_data.array.num = num;
-    }
+void responseIntsShow(RILResponse *resp)
+{
+    LOGI << __LINE__ << ENDL;
+    if (!resp)
+        return;
+    LOGI << __LINE__ << ENDL;
+    LOGI << "UNMARSHAL: num of int = " << resp->responseData.array.num;
+    int *data = (int *)resp->responseData.array.data;
+    for (int i = 0; i < resp->responseData.array.num; i++)
+        LOGI << data[i] << ENDL;
+}
 
-    LOGD << "UNMARSHAL: ";
-    for (auto i : response)
-        LOGD << i << ENDL;
+void responseIntsFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseVoid(Parcel &p, RILResponse *resp)
 {
     if (resp)
-    {
-        resp->type = TYPE_VOID;
-        LOGD << "UNMARSHAL: void response, error = " << resp->error_code << ENDL;
-    }
+        return;
+
+    resp->responseType = TYPE_VOID;
+    LOGI << "UNMARSHAL: void response, error = " << resp->errorCode << ENDL;
+}
+
+void responseVoidShow(RILResponse *resp)
+{
+    if (resp)
+        LOGI << "UNMARSHAL: void response, error = " << resp->errorCode << ENDL;
+}
+
+void responseVoidFree(RILResponse *resp)
+{
 }
 
 // private
@@ -244,12 +299,11 @@ void responseVoid(Parcel &p, RILResponse *resp)
 
 void responseCallForward(Parcel &p, RILResponse *resp)
 {
-    //     int numInfos;
-    RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)malloc(sizeof(RIL_SuppSvcNotification));
-    if (!response || !resp)
-    {
+    if (!resp)
         return;
-    }
+
+    RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)malloc(sizeof(RIL_SuppSvcNotification));
+    ERROR_MALLOC0(response);
 
     response->notificationType = p.readInt32();
     response->code = p.readInt32();
@@ -257,20 +311,43 @@ void responseCallForward(Parcel &p, RILResponse *resp)
     response->type = p.readInt32();
     response->number = p.readString();
 
-    resp->type = TYPE_STRUCT;
-    resp->response_data.array.num = 1;
-    resp->response_data.array.data = response;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseCallForwardShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)resp->responseData.array.data;
+    LOGI << "  notificationType = " << response->notificationType << ENDL;
+    LOGI << "  code  = " << response->code << ENDL;
+    LOGI << "  index = " << response->index << ENDL;
+    LOGI << "  type  = " << response->type << ENDL;
+    LOGI << "  number= " << NULLSTR(response->number) << ENDL;
+}
+
+void responseCallForwardFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)resp->responseData.array.data;
+    SAFETYFREE(response->number);
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseSuppServiceNotification(Parcel &p, RILResponse *resp)
 {
     int digitCount;
     int digitLimit;
-    RIL_CDMA_SMS_Message *response = (RIL_CDMA_SMS_Message *)malloc(sizeof(RIL_CDMA_SMS_Message));
-    if (!response || !resp)
-    {
+    if (!resp)
         return;
-    }
+
+    RIL_CDMA_SMS_Message *response = (RIL_CDMA_SMS_Message *)malloc(sizeof(RIL_CDMA_SMS_Message));
+    ERROR_MALLOC0(response);
 
     response->uTeleserviceID = p.readInt32();
     response->bIsServicePresent = p.readInt32();
@@ -303,69 +380,172 @@ void responseSuppServiceNotification(Parcel &p, RILResponse *resp)
         response->aBearerData[digitCount] = p.readInt32();
     }
 
-    resp->type = TYPE_STRUCT;
-    resp->response_data.array.num = 1;
-    resp->response_data.array.data = response;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseSuppServiceNotificationShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_CDMA_SMS_Message *response = (RIL_CDMA_SMS_Message *)resp->responseData.array.data;
+
+    LOGI << "  uTeleserviceID = " << response->uTeleserviceID << ENDL;
+    LOGI << "  bIsServicePresent = " << response->bIsServicePresent << ENDL;
+    LOGI << "  uServicecategory = " << response->uServicecategory << ENDL;
+    LOGI << "  sAddress.digit_mode  = " << response->sAddress.digit_mode << ENDL;
+    LOGI << "  sAddress.number_mode = " << response->sAddress.number_mode << ENDL;
+    LOGI << "  sAddress.number_type = " << response->sAddress.number_type << ENDL;
+    LOGI << "  sAddress.number_plan = " << response->sAddress.number_plan << ENDL;
+    LOGI << "  sAddress.number_of_digits = " << response->sAddress.number_of_digits << ENDL;
+    int digitLimit = response->sAddress.number_of_digits < RIL_CDMA_SMS_ADDRESS_MAX ? response->sAddress.number_of_digits : RIL_CDMA_SMS_ADDRESS_MAX;
+    for (int digitCount = 0; digitCount < digitLimit; digitCount++)
+        LOGI << "    digits[" << digitCount << "]" << response->sAddress.digits[digitCount] << ENDL;
+
+    LOGI << "  sSubAddress.subaddressType = " << response->sSubAddress.subaddressType << ENDL;
+    LOGI << "  sSubAddress.odd = " << response->sSubAddress.odd << ENDL;
+    LOGI << "  sSubAddress.number_of_digits = " << response->sSubAddress.number_of_digits << ENDL;
+
+    digitLimit = response->sSubAddress.number_of_digits < RIL_CDMA_SMS_SUBADDRESS_MAX ? response->sSubAddress.number_of_digits : RIL_CDMA_SMS_SUBADDRESS_MAX;
+    for (int digitCount = 0; digitCount < digitLimit; digitCount++)
+        LOGI << "    digits[" << digitCount << "]" << response->sSubAddress.digits[digitCount] << ENDL;
+}
+
+void responseSuppServiceNotificationFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseRaw(Parcel &p, RILResponse *resp)
 {
-    int response;
-    int response_len;
-    response_len = p.readInt32();
-    response = p.readInt32();
+    // int response_len = p.readInt32();
+    // if (!resp)
+    //     return;
 
-    if (!response || !resp)
-    {
-        return;
-    }
+    // uint8_t* response = ;
 
-    (void)response_len;
-    resp->type = TYPE_INT;
-    resp->response_data.value_int = response;
+    // if (!response || !resp)
+    //     return;
+
+    // (void)response_len;
+    // resp->responseType = TYPE_INT;
+    // resp->responseData.value_int = response;
+}
+
+void responseRawShow(RILResponse *resp)
+{
+    // int response;
+    // int response_len;
+    // response_len = p.readInt32();
+    // response = p.readInt32();
+
+    // if (!response || !resp)
+    //     return;
+
+    // (void)response_len;
+    // resp->responseType = TYPE_INT;
+    // resp->responseData.value_int = response;
+}
+
+void responseRawFree(RILResponse *resp)
+{
+    // int response;
+    // int response_len;
+    // response_len = p.readInt32();
+    // response = p.readInt32();
+
+    // if (!response || !resp)
+    //     return;
+
+    // (void)response_len;
+    // resp->responseType = TYPE_INT;
+    // resp->responseData.value_int = response;
 }
 
 void responseSMS(Parcel &p, RILResponse *resp)
 {
-    RIL_SMS_Response *response = (RIL_SMS_Response *)malloc(sizeof(RIL_SMS_Response));
-    if (!response || !resp)
-    {
+    if (!resp)
         return;
-    }
+    RIL_SMS_Response *response = (RIL_SMS_Response *)malloc(sizeof(RIL_SMS_Response));
+    ERROR_MALLOC0(response);
 
     response->messageRef = p.readInt32();
     response->ackPDU = p.readString();
     response->errorCode = p.readInt32();
 
-    resp->type = TYPE_STRUCT;
-    resp->response_data.array.num = 1;
-    resp->response_data.array.data = response;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseSMSShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_SMS_Response *response = (RIL_SMS_Response *)resp->responseData.array.data;
+    LOGI << "  messageRef = " << response->messageRef << ENDL;
+    LOGI << "  ackPDU = " << response->ackPDU << ENDL;
+    LOGI << "  errorCode = " << response->errorCode << ENDL;
+}
+
+void responseSMSFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseICC_IO(Parcel &p, RILResponse *resp)
 {
-    RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)malloc(sizeof(RIL_SIM_IO_Response));
-    if (!response || !resp)
-    {
+    if (!resp)
         return;
-    }
 
+    RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)malloc(sizeof(RIL_SIM_IO_Response));
+    ERROR_MALLOC0(response);
     response->sw1 = p.readInt32();
     response->sw2 = p.readInt32();
     response->simResponse = p.readString();
 
-    resp->type = TYPE_STRUCT;
-    resp->response_data.array.num = 1;
-    resp->response_data.array.data = response;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseICC_IOShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)resp->responseData.array.data;
+    LOGI << "  sw1 = " << response->sw1 << ENDL;
+    LOGI << "  sw2 = " << response->sw2 << ENDL;
+    LOGI << "  simResponse = " << response->simResponse << ENDL;
+}
+
+void responseICC_IOFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)resp->responseData.array.data;
+    SAFETYFREE(response->simResponse);
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseIccCardStatus(Parcel &p, RILResponse *resp)
 {
-    RIL_CardStatus_v6 *response = (RIL_CardStatus_v6 *)malloc(sizeof(sizeof(RIL_CardStatus_v6)));
-    if (!response || !resp)
-    {
+    if (!resp)
         return;
-    }
+
+    RIL_CardStatus_v6 *response = (RIL_CardStatus_v6 *)malloc(sizeof(sizeof(RIL_CardStatus_v6)));
+    ERROR_MALLOC0(response);
 
     response->card_state = static_cast<RIL_CardState>(p.readInt32());
     response->universal_pin_state = static_cast<RIL_PinState>(p.readInt32());
@@ -385,38 +565,58 @@ void responseIccCardStatus(Parcel &p, RILResponse *resp)
         response->applications[i].pin2 = static_cast<RIL_PinState>(p.readInt32());
     }
 
-    resp->type = TYPE_STRUCT;
-    resp->response_data.array.num = 1;
-    resp->response_data.array.data = response;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
 
-    LOGD << "UNMARSHALL: num of struct = " << response->num_applications << ENDL;
-    LOGD << "  response->card_state = " << response->card_state << ENDL;
-    LOGD << "  response->universal_pin_state = " << response->universal_pin_state << ENDL;
-    LOGD << "  response->gsm_umts_subscription_app_index = " << response->gsm_umts_subscription_app_index << ENDL;
-    LOGD << "  response->cdma_subscription_app_index     = " << response->cdma_subscription_app_index << ENDL;
-    LOGD << "  response->ims_subscription_app_index      = " << response->ims_subscription_app_index << ENDL;
-    LOGD << "  response->num_applications = " << response->num_applications << ENDL;
+void responseIccCardStatusShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_CardStatus_v6 *response = (RIL_CardStatus_v6 *)resp->responseData.array.data;
+    LOGI << "UNMARSHALL: num of struct = " << response->num_applications << ENDL;
+    LOGI << "  response->card_state = " << response->card_state << ENDL;
+    LOGI << "  response->universal_pin_state = " << response->universal_pin_state << ENDL;
+    LOGI << "  response->gsm_umts_subscription_app_index = " << response->gsm_umts_subscription_app_index << ENDL;
+    LOGI << "  response->cdma_subscription_app_index     = " << response->cdma_subscription_app_index << ENDL;
+    LOGI << "  response->ims_subscription_app_index      = " << response->ims_subscription_app_index << ENDL;
+    LOGI << "  response->num_applications = " << response->num_applications << ENDL;
     for (int i = 0; i < response->num_applications; i++)
     {
-        LOGD << "  [" << i << "] app_type = " << response->applications[i].app_type << ENDL;
-        LOGD << "  [" << i << "] app_state = " << response->applications[i].app_state << ENDL;
-        LOGD << "  [" << i << "] perso_substate = " << response->applications[i].perso_substate << ENDL;
-        LOGD << "  [" << i << "] aid_ptr = " << NULLSTR(response->applications[i].aid_ptr) << ENDL;
-        LOGD << "  [" << i << "] app_label_ptr = " << NULLSTR(response->applications[i].app_label_ptr) << ENDL;
-        LOGD << "  [" << i << "] pin1_replaced = " << response->applications[i].pin1_replaced << ENDL;
-        LOGD << "  [" << i << "] pin1 = " << response->applications[i].pin1 << ENDL;
-        LOGD << "  [" << i << "] pin2 = " << response->applications[i].pin2 << ENDL;
+        LOGI << "  [" << i << "] app_type = " << response->applications[i].app_type << ENDL;
+        LOGI << "  [" << i << "] app_state = " << response->applications[i].app_state << ENDL;
+        LOGI << "  [" << i << "] perso_substate = " << response->applications[i].perso_substate << ENDL;
+        LOGI << "  [" << i << "] aid_ptr = " << NULLSTR(response->applications[i].aid_ptr) << ENDL;
+        LOGI << "  [" << i << "] app_label_ptr = " << NULLSTR(response->applications[i].app_label_ptr) << ENDL;
+        LOGI << "  [" << i << "] pin1_replaced = " << response->applications[i].pin1_replaced << ENDL;
+        LOGI << "  [" << i << "] pin1 = " << response->applications[i].pin1 << ENDL;
+        LOGI << "  [" << i << "] pin2 = " << response->applications[i].pin2 << ENDL;
     }
+}
+
+void responseIccCardStatusFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_CardStatus_v6 *response = (RIL_CardStatus_v6 *)resp->responseData.array.data;
+    for (int i = 0; i < response->num_applications; i++)
+    {
+        SAFETYFREE(response->applications[i].aid_ptr);
+        SAFETYFREE(response->applications[i].app_label_ptr);
+    }
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseCallList(Parcel &p, RILResponse *resp)
 {
     int num = p.readInt32();
-    RIL_Call *response = (RIL_Call *)malloc(sizeof(RIL_Call) * num);
-    if (!response || !resp)
-    {
+    if (!resp)
         return;
-    }
+    RIL_Call *response = (RIL_Call *)malloc(sizeof(RIL_Call) * num);
+    ERROR_MALLOC0(response);
 
     for (int i = 0; i < num; i++)
     {
@@ -450,36 +650,66 @@ void responseCallList(Parcel &p, RILResponse *resp)
         }
     }
 
-    resp->type = TYPE_STRUCT;
-    resp->response_data.array.num = num;
-    resp->response_data.array.data = response;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = num;
+    resp->responseData.array.data = response;
+}
 
-    LOGD << "UNMARSHALL: num of struct = " << num << ENDL;
+void responseCallListShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    int num = resp->responseData.array.num;
+    RIL_Call *response = (RIL_Call *)resp->responseData.array.data;
+    LOGI << "UNMARSHALL: num of struct = " << num << ENDL;
     for (int i = 0; i < num; i++)
     {
-        LOGD << "  state = " << response[i].state << ENDL;
-        LOGD << "  index = " << response[i].index << ENDL;
-        LOGD << "  toa   = " << response[i].toa << ENDL;
-        LOGD << "  isMpty= " << response[i].isMpty << ENDL;
-        LOGD << "  isMT  = " << response[i].isMT << ENDL;
-        LOGD << "  als   = " << response[i].als << ENDL;
-        LOGD << "  isVoice = " << response[i].isVoice << ENDL;
-        LOGD << "  isVoicePrivacy = " << response[i].isVoicePrivacy << ENDL;
-        LOGD << "  number = " << NULLSTR(response[i].number) << ENDL;
-        LOGD << "  numberPresentation = " << response[i].numberPresentation << ENDL;
-        LOGD << "  name = " << NULLSTR(response[i].name) << ENDL;
-        LOGD << "  namePresentation = " << response[i].namePresentation << ENDL;
+        LOGI << "  state = " << response[i].state << ENDL;
+        LOGI << "  index = " << response[i].index << ENDL;
+        LOGI << "  toa   = " << response[i].toa << ENDL;
+        LOGI << "  isMpty= " << response[i].isMpty << ENDL;
+        LOGI << "  isMT  = " << response[i].isMT << ENDL;
+        LOGI << "  als   = " << response[i].als << ENDL;
+        LOGI << "  isVoice = " << response[i].isVoice << ENDL;
+        LOGI << "  isVoicePrivacy = " << response[i].isVoicePrivacy << ENDL;
+        LOGI << "  number = " << NULLSTR(response[i].number) << ENDL;
+        LOGI << "  numberPresentation = " << response[i].numberPresentation << ENDL;
+        LOGI << "  name = " << NULLSTR(response[i].name) << ENDL;
+        LOGI << "  namePresentation = " << response[i].namePresentation << ENDL;
 
-        LOGD << "  namePresentation = " << response[i].namePresentation << ENDL;
+        LOGI << "  namePresentation = " << response[i].namePresentation << ENDL;
         if (response[i].uusInfo)
         {
-            LOGD << "  uusType = " << response[i].uusInfo->uusType << ENDL;
-            LOGD << "  uusDcs = " << response[i].uusInfo->uusDcs << ENDL;
-            LOGD << "  uusLength = " << response[i].uusInfo->uusLength << ENDL;
-            LOGD << "  uusData = " << NULLSTR(response[i].uusInfo->uusData) << ENDL;
+            LOGI << "  uusType = " << response[i].uusInfo->uusType << ENDL;
+            LOGI << "  uusDcs = " << response[i].uusInfo->uusDcs << ENDL;
+            LOGI << "  uusLength = " << response[i].uusInfo->uusLength << ENDL;
+            LOGI << "  uusData = " << NULLSTR(response[i].uusInfo->uusData) << ENDL;
         }
     }
 }
+
+void responseCallListFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    int num = resp->responseData.array.num;
+    RIL_Call *response = (RIL_Call *)resp->responseData.array.data;
+    LOGI << "UNMARSHALL: num of struct = " << num << ENDL;
+    for (int i = 0; i < num; i++)
+    {
+        SAFETYFREE(response[i].number);
+        SAFETYFREE(response[i].name);
+        if (response[i].uusInfo)
+        {
+            SAFETYFREE(response[i].uusInfo->uusData);
+            SAFETYFREE(response[i].uusInfo);
+        }
+    }
+    SAFETYFREE(resp->responseData.array.data);
+}
+
 //     int num;
 //     int voiceSettings;
 //     ArrayList<DriverCall> response;
@@ -534,12 +764,11 @@ void responseDataCallList(Parcel &p, RILResponse *resp)
 {
     int dontCare = p.readInt32();
     int num = p.readInt32();
-    RIL_Data_Call_Response_v9 *response = (RIL_Data_Call_Response_v9 *)malloc(sizeof(RIL_Data_Call_Response_v9) * num);
-    if (!response || !resp)
-    {
+    if (!resp)
         return;
-    }
 
+    RIL_Data_Call_Response_v9 *response = (RIL_Data_Call_Response_v9 *)malloc(sizeof(RIL_Data_Call_Response_v9) * num);
+    ERROR_MALLOC0(response);
     (void)dontCare;
     for (int i = 0; i < num; i++)
     {
@@ -555,29 +784,65 @@ void responseDataCallList(Parcel &p, RILResponse *resp)
         response[i].pcscf = p.readString();
     }
 
-    resp->type = TYPE_STRUCT;
-    resp->response_data.array.num = num;
-    resp->response_data.array.data = response;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = num;
+    resp->responseData.array.data = response;
+}
 
-    LOGD << "UNMARSHALL: num of struct " << num << ENDL;
+void responseDataCallListShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_Data_Call_Response_v9 *response = (RIL_Data_Call_Response_v9 *)resp->responseData.array.data;
+    int num = resp->responseData.array.num;
+    LOGI << "UNMARSHALL: num of struct " << num << ENDL;
     for (int i = 0; i < num; i++)
     {
-        LOGD << "  status   = " << response[i].status << ENDL;
-        LOGD << "  suggestedRetryTime = " << response[i].suggestedRetryTime << ENDL;
-        LOGD << "  cid      = " << response[i].cid << ENDL;
-        LOGD << "  active   = " << response[i].active << ENDL;
-        LOGD << "  type     = " << NULLSTR(response[i].type) << ENDL;
-        LOGD << "  ifname   = " << NULLSTR(response[i].ifname) << ENDL;
-        LOGD << "  addresses= " << NULLSTR(response[i].addresses) << ENDL;
-        LOGD << "  dnses    = " << NULLSTR(response[i].dnses) << ENDL;
-        LOGD << "  gateways = " << NULLSTR(response[i].gateways) << ENDL;
-        LOGD << "  pcscf    = " << NULLSTR(response[i].pcscf) << ENDL;
+        LOGI << "  status   = " << response[i].status << ENDL;
+        LOGI << "  suggestedRetryTime = " << response[i].suggestedRetryTime << ENDL;
+        LOGI << "  cid      = " << response[i].cid << ENDL;
+        LOGI << "  active   = " << response[i].active << ENDL;
+        LOGI << "  type     = " << NULLSTR(response[i].type) << ENDL;
+        LOGI << "  ifname   = " << NULLSTR(response[i].ifname) << ENDL;
+        LOGI << "  addresses= " << NULLSTR(response[i].addresses) << ENDL;
+        LOGI << "  dnses    = " << NULLSTR(response[i].dnses) << ENDL;
+        LOGI << "  gateways = " << NULLSTR(response[i].gateways) << ENDL;
+        LOGI << "  pcscf    = " << NULLSTR(response[i].pcscf) << ENDL;
+    }
+}
+
+void responseDataCallListFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_Data_Call_Response_v9 *response = (RIL_Data_Call_Response_v9 *)resp->responseData.array.data;
+    int num = resp->responseData.array.num;
+    for (int i = 0; i < num; i++)
+    {
+        SAFETYFREE(response[i].type);
+        SAFETYFREE(response[i].ifname);
+        SAFETYFREE(response[i].addresses);
+        SAFETYFREE(response[i].dnses);
+        SAFETYFREE(response[i].gateways);
+        SAFETYFREE(response[i].pcscf);
     }
 }
 
 void responseSetupDataCall(Parcel &p, RILResponse *resp)
 {
     return responseDataCallList(p, resp);
+}
+
+void responseSetupDataCallShow(RILResponse *resp)
+{
+    return responseDataCallListShow(resp);
+}
+
+void responseSetupDataCallFree(RILResponse *resp)
+{
+    return responseDataCallListFree(resp);
 }
 
 void responseOperatorInfos(Parcel &p, RILResponse *resp)
@@ -604,41 +869,70 @@ void responseOperatorInfos(Parcel &p, RILResponse *resp)
     //     }
 }
 
+void responseOperatorInfosShow(RILResponse *resp) {}
+
+void responseOperatorInfosFree(RILResponse *resp) {}
+
 void responseCellList(Parcel &p, RILResponse *resp)
 {
-    std::vector<RIL_NeighboringCell> response;
+    if (!resp)
+        return;
 
     int num = p.readInt32();
+    RIL_NeighboringCell *response = (RIL_NeighboringCell *)malloc(num * sizeof(RIL_NeighboringCell));
+    ERROR_MALLOC0(response);
     for (int i = 0; i < num; i++)
     {
-        int rssi = p.readInt32();
-        std::string location = p.readString();
-        response.emplace_back(RIL_NeighboringCell{location.c_str(), rssi});
+        response[i].rssi = p.readInt32();
+        response[i].cid = p.readString();
     }
 
-    if (resp)
-    {
-        resp->type = TYPE_STRUCT;
-        resp->response_data.array.num = num;
-        RIL_NeighboringCell *data = (RIL_NeighboringCell *)malloc(num * sizeof(RIL_NeighboringCell));
-        for (int i = 0; i < num; i++)
-        {
-            data[i].rssi = response[i].rssi;
-            data[i].cid = strdup(response[i].cid);
-        }
-    }
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = num;
+    resp->responseData.array.data = response;
+}
 
-    LOGD << "UNMARSHALL: num of struct " << num << ENDL;
+void responseCellListShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    int num = resp->responseData.array.num;
+    RIL_NeighboringCell *response = (RIL_NeighboringCell *)resp->responseData.array.data;
+    LOGI << "UNMARSHALL: num of struct " << num << ENDL;
     for (int i = 0; i < num; i++)
     {
-        LOGD << "RIL_NeighboringCell[" << i << "] cid = " << response[i].cid << ENDL;
-        LOGD << "RIL_NeighboringCell[" << i << "] rssi = " << response[i].rssi << ENDL;
+        LOGI << "RIL_NeighboringCell[" << i << "] cid = " << NULLSTR(response[i].cid) << ENDL;
+        LOGI << "RIL_NeighboringCell[" << i << "] rssi = " << response[i].rssi << ENDL;
     }
+}
+
+void responseCellListFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    int num = resp->responseData.array.num;
+    RIL_NeighboringCell *response = (RIL_NeighboringCell *)resp->responseData.array.data;
+    LOGI << "UNMARSHALL: num of struct " << num << ENDL;
+    for (int i = 0; i < num; i++)
+        SAFETYFREE(response[i].cid);
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseGetPreferredNetworkType(Parcel &p, RILResponse *resp)
 {
     responseInts(p, resp);
+}
+
+void responseGetPreferredNetworkTypeShow(RILResponse *resp)
+{
+    responseIntsShow(resp);
+}
+
+void responseGetPreferredNetworkTypeFree(RILResponse *resp)
+{
+    responseIntsFree(resp);
 }
 
 void responseGmsBroadcastConfig(Parcel &p, RILResponse *resp)
@@ -708,12 +1002,11 @@ void responseCdmaBroadcastConfig(Parcel &p, RILResponse *resp)
 
 void responseSignalStrength(Parcel &p, RILResponse *resp)
 {
-    RIL_SignalStrength_v10 *response = (RIL_SignalStrength_v10 *)malloc(sizeof(RIL_SignalStrength_v10));
-    if (!response || !resp)
-    {
+    if (!resp)
         return;
-    }
 
+    RIL_SignalStrength_v10 *response = (RIL_SignalStrength_v10 *)malloc(sizeof(RIL_SignalStrength_v10));
+    ERROR_MALLOC0(response);
     response->GW_SignalStrength.signalStrength = p.readInt32();
     response->GW_SignalStrength.bitErrorRate = p.readInt32();
     response->CDMA_SignalStrength.dbm = p.readInt32();
@@ -727,23 +1020,37 @@ void responseSignalStrength(Parcel &p, RILResponse *resp)
     response->LTE_SignalStrength.cqi = p.readInt32();
     response->TD_SCDMA_SignalStrength.rscp = p.readInt32();
 
-    resp->type = TYPE_STRUCT;
-    resp->response_data.array.num = 1;
-    resp->response_data.array.data = response;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
 
-    LOGD << "UNMARSHALL:" << ENDL;
-    LOGD << "  GW_SignalStrength.signalStrength = " << response->GW_SignalStrength.signalStrength << ENDL;
-    LOGD << "  GW_SignalStrength.bitErrorRate   = " << response->GW_SignalStrength.bitErrorRate << ENDL;
-    LOGD << "  CDMA_SignalStrength.dbm          = " << response->CDMA_SignalStrength.dbm << ENDL;
-    LOGD << "  CDMA_SignalStrength.ecio         = " << response->CDMA_SignalStrength.ecio << ENDL;
-    LOGD << "  EVDO_SignalStrength.dbm          = " << response->EVDO_SignalStrength.dbm << ENDL;
-    LOGD << "  EVDO_SignalStrength.ecio         = " << response->EVDO_SignalStrength.ecio << ENDL;
-    LOGD << "  EVDO_SignalStrength.signalNoiseRatio = " << response->EVDO_SignalStrength.signalNoiseRatio << ENDL;
-    LOGD << "  LTE_SignalStrength.signalStrength = " << response->LTE_SignalStrength.signalStrength << ENDL;
-    LOGD << "  LTE_SignalStrength.rsrp          = " << response->LTE_SignalStrength.rsrp << ENDL;
-    LOGD << "  LTE_SignalStrength.rsrq          = " << response->LTE_SignalStrength.rsrq << ENDL;
-    LOGD << "  LTE_SignalStrength.cqi           = " << response->LTE_SignalStrength.cqi << ENDL;
-    LOGD << "  TD_SCDMA_SignalStrength.rscp     = " << response->TD_SCDMA_SignalStrength.rscp << ENDL;
+void responseSignalStrengthShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_SignalStrength_v10 *response = (RIL_SignalStrength_v10 *)resp->responseData.array.data;
+    LOGI << "UNMARSHALL:" << ENDL;
+    LOGI << "  GW_SignalStrength.signalStrength = " << response->GW_SignalStrength.signalStrength << ENDL;
+    LOGI << "  GW_SignalStrength.bitErrorRate   = " << response->GW_SignalStrength.bitErrorRate << ENDL;
+    LOGI << "  CDMA_SignalStrength.dbm          = " << response->CDMA_SignalStrength.dbm << ENDL;
+    LOGI << "  CDMA_SignalStrength.ecio         = " << response->CDMA_SignalStrength.ecio << ENDL;
+    LOGI << "  EVDO_SignalStrength.dbm          = " << response->EVDO_SignalStrength.dbm << ENDL;
+    LOGI << "  EVDO_SignalStrength.ecio         = " << response->EVDO_SignalStrength.ecio << ENDL;
+    LOGI << "  EVDO_SignalStrength.signalNoiseRatio = " << response->EVDO_SignalStrength.signalNoiseRatio << ENDL;
+    LOGI << "  LTE_SignalStrength.signalStrength = " << response->LTE_SignalStrength.signalStrength << ENDL;
+    LOGI << "  LTE_SignalStrength.rsrp          = " << response->LTE_SignalStrength.rsrp << ENDL;
+    LOGI << "  LTE_SignalStrength.rsrq          = " << response->LTE_SignalStrength.rsrq << ENDL;
+    LOGI << "  LTE_SignalStrength.cqi           = " << response->LTE_SignalStrength.cqi << ENDL;
+    LOGI << "  TD_SCDMA_SignalStrength.rscp     = " << response->TD_SCDMA_SignalStrength.rscp << ENDL;
+}
+
+void responseSignalStrengthFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseCdmaInformationRecord(Parcel &p, RILResponse *resp)
@@ -764,6 +1071,8 @@ void responseCdmaInformationRecord(Parcel &p, RILResponse *resp)
     //         response.add(InfoRec);
     //     }
 }
+void responseCdmaInformationRecordShow(RILResponse *resp) {}
+void responseCdmaInformationRecordFree(RILResponse *resp) {}
 
 void responseCdmaCallWaiting(Parcel &p, RILResponse *resp)
 {
@@ -780,6 +1089,8 @@ void responseCdmaCallWaiting(Parcel &p, RILResponse *resp)
     //     notification.numberType = p.readInt32();
     //     notification.numberPlan = p.readInt32();
 }
+void responseCdmaCallWaitingShow(RILResponse *resp) {}
+void responseCdmaCallWaitingFree(RILResponse *resp) {}
 
 void responseCallRing(Parcel &p, RILResponse *resp)
 {
@@ -791,9 +1102,14 @@ void responseCallRing(Parcel &p, RILResponse *resp)
     //     response[3] = (char)p.readInt32(); // signal
 }
 
+void responseCallRingShow(RILResponse *resp) {}
+void responseCallRingFree(RILResponse *resp) {}
+
 void responseCdmaSms(Parcel &, RILResponse *)
 {
 }
+void responseCdmaSmsShow(RILResponse *) {}
+void responseCdmaSmsFree(RILResponse *) {}
 
 // private
 // void notifyRegistrantsCdmaInfoRec(CdmaInformationRecords infoRec)
