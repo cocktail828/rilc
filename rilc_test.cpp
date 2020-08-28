@@ -13,18 +13,17 @@
 #include "rilc_interface.h"
 #include "logger.h"
 
-std::mutex mutex;
-std::condition_variable cond;
+std::mutex mutexSocilited;
+std::condition_variable condSocilited;
 
 void socilited_notify(RILResponse *arg)
 {
-    cond.notify_one();
+    condSocilited.notify_one();
     LOGI << "RILC call user defined socilited_notify function" << ENDL;
 }
 
-void unsocilited_notify(void *arg)
+void unsocilited_notify(RILResponse *arg)
 {
-    cond.notify_one();
     LOGI << "RILC call user defined unsocilited_notify function" << ENDL;
 }
 
@@ -39,9 +38,9 @@ static int sg_index = 0;
         RILResponse resp;                                                                        \
         memset(&resp, 0, sizeof(RILResponse));                                                   \
         resp.responseNotify = socilited_notify;                                                  \
-        std::unique_lock<std::mutex> _lk(mutex);                                                 \
+        std::unique_lock<std::mutex> _lk(mutexSocilited);                                        \
         func(&resp, ##args);                                                                     \
-        if (cond.wait_for(_lk, std::chrono::seconds(60)) == std::cv_status::timeout)             \
+        if (condSocilited.wait_for(_lk, std::chrono::seconds(60)) == std::cv_status::timeout)    \
         {                                                                                        \
             LOGI << ">>>>>>>> RILC_TEST index: " << sg_index << " failed for timeout" << ENDL;   \
             LOGE << "OOPS!!! request timeout" << ENDL;                                           \
@@ -165,28 +164,75 @@ int main(int argc, char **argv)
             RILC_init("/dev/ttyUSB4");
     }
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_getIMEI);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_NEW_SMS, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_ON_USSD, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_ON_USSD_REQUEST, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_NITZ_TIME_RECEIVED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_SIGNAL_STRENGTH, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_DATA_CALL_LIST_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_SUPP_SVC_NOTIFICATION, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_STK_SESSION_END, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_STK_PROACTIVE_COMMAND, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_STK_EVENT_NOTIFY, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_STK_CALL_SETUP, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_SIM_SMS_STORAGE_FULL, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_SIM_REFRESH, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_CALL_RING, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_CDMA_NEW_SMS, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_NEW_BROADCAST_SMS, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_CDMA_RUIM_SMS_STORAGE_FULL, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESTRICTED_STATE_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_ENTER_EMERGENCY_CALLBACK_MODE, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_CDMA_CALL_WAITING, unsocilited_notify); // TOD;
+    RILC_unsocilitedRegister(RIL_UNSOL_CDMA_OTA_PROVISION_STATUS, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_CDMA_INFO_REC, unsocilited_notify); // TOD;
+    RILC_unsocilitedRegister(RIL_UNSOL_OEM_HOOK_RAW, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RINGBACK_TONE, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RESEND_INCALL_MUTE, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_CDMA_PRL_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RIL_CONNECTED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_VOICE_RADIO_TECH_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_CELL_INFO_LIST, unsocilited_notify); // TOD;
+    RILC_unsocilitedRegister(RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_SRVCC_STATE_NOTIFY, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_HARDWARE_CONFIG_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_DC_RT_INFO_CHANGED, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_RADIO_CAPABILITY, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_ON_SS, unsocilited_notify); // TOD;
+    RILC_unsocilitedRegister(RIL_UNSOL_STK_CC_ALPHA_NOTIFY, unsocilited_notify);
+    RILC_unsocilitedRegister(RIL_UNSOL_LCEDATA_RECV, unsocilited_notify);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_getIMEISV);
+    RILC_TEST_ABORT_TIMEOUT(RILC_getIMEI);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_getIMSI);
+    RILC_TEST_ABORT_TIMEOUT(RILC_getIMEISV);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_getVoiceRegistrationState);
+    RILC_TEST_ABORT_TIMEOUT(RILC_getIMSI);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_getDataRegistrationState);
+    RILC_TEST_ABORT_TIMEOUT(RILC_getVoiceRegistrationState);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_getOperator);
+    RILC_TEST_ABORT_TIMEOUT(RILC_getDataRegistrationState);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_getNeighboringCids);
+    RILC_TEST_ABORT_TIMEOUT(RILC_getOperator);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_getSignalStrength);
+    RILC_TEST_ABORT_TIMEOUT(RILC_getNeighboringCids);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_getPreferredNetworkType);
+    RILC_TEST_ABORT_TIMEOUT(RILC_getSignalStrength);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_setPreferredNetworkType, RADIO_TECHNOLOGY_LTE);
+    RILC_TEST_ABORT_TIMEOUT(RILC_getPreferredNetworkType);
 
-    // RILC_TEST_ABORT_TIMEOUT(RILC_setupDataCall, RADIO_TECHNOLOGY_LTE, "0", "3gnet",
-    //                         "", "", SETUP_DATA_AUTH_NONE, PROTOCOL_IPV4);
+    RILC_TEST_ABORT_TIMEOUT(RILC_setPreferredNetworkType, RADIO_TECHNOLOGY_LTE);
+
+    RILC_TEST_ABORT_TIMEOUT(RILC_setupDataCall, RADIO_TECHNOLOGY_LTE, "0", "3gnet",
+                            "", "", SETUP_DATA_AUTH_NONE, PROTOCOL_IPV4);
 
     RILC_TEST_ABORT_TIMEOUT(RILC_getIccCardStatus);
 

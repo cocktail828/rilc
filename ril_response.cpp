@@ -4,7 +4,7 @@
 #include "logger.h"
 
 #define PROCESSER(i, v) \
-    RILCProcesser { i, v, v##Show, v##Free }
+    RILCProcesser { i, v, v##Show, v##Free, nullptr }
 
 /* socilited response handlers */
 static RILCProcesser SocilitedResponseProcesser[] = {
@@ -262,15 +262,14 @@ void responseStrings(Parcel &p, RILResponse *resp)
 
     int num = p.readInt32();
     const char **data = nullptr;
-
     if (num <= 0)
     {
         num = 0;
     }
     else
     {
-        const char **data = (const char **)malloc(num * sizeof(char **));
-        ERROR_MALLOC0(data, (num * sizeof(char **)));
+        data = (const char **)malloc(num * sizeof(char *));
+        ERROR_MALLOC0(data, num * sizeof(char *));
         for (int i = 0; i < num; i++)
             data[i] = p.readString();
     }
@@ -2051,6 +2050,8 @@ std::string responseToString(int respid)
         return "UNSOL_NITZ_TIME_RECEIVED";
     case RIL_UNSOL_SIGNAL_STRENGTH:
         return "UNSOL_SIGNAL_STRENGTH";
+    case RIL_UNSOL_DATA_CALL_LIST_CHANGED:
+        return "UNSOL_DATA_CALL_LIST_CHANGED";
     case RIL_UNSOL_SUPP_SVC_NOTIFICATION:
         return "UNSOL_SUPP_SVC_NOTIFICATION";
     case RIL_UNSOL_STK_SESSION_END:
@@ -2065,8 +2066,6 @@ std::string responseToString(int respid)
         return "UNSOL_SIM_SMS_STORAGE_FUL";
     case RIL_UNSOL_SIM_REFRESH:
         return "UNSOL_SIM_REFRESH";
-    case RIL_UNSOL_DATA_CALL_LIST_CHANGED:
-        return "UNSOL_DATA_CALL_LIST_CHANGED";
     case RIL_UNSOL_CALL_RING:
         return "UNSOL_CALL_RING";
     case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:
@@ -2106,19 +2105,24 @@ std::string responseToString(int respid)
     case RIL_UNSOL_CELL_INFO_LIST:
         return "UNSOL_CELL_INFO_LIST";
     case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED:
-        return "RESPONSE_IMS_NETWORK_STATE_CHANGED";
+        return "UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED";
     case RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED:
         return "UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED";
     case RIL_UNSOL_SRVCC_STATE_NOTIFY:
         return "UNSOL_SRVCC_STATE_NOTIFY";
     case RIL_UNSOL_HARDWARE_CONFIG_CHANGED:
-        return "HARDWARE_CONFIG_CHANGED";
+        return "UNSOL_HARDWARE_CONFIG_CHANGED";
     case RIL_UNSOL_DC_RT_INFO_CHANGED:
         return "UNSOL_DC_RT_INFO_CHANGED";
     case RIL_UNSOL_RADIO_CAPABILITY:
         return "UNSOL_RADIO_CAPABILITY";
-    case RIL_RESPONSE_ACKNOWLEDGEMENT:
-        return "RIL_RESPONSE_ACKNOWLEDGEMENT";
+    case RIL_UNSOL_ON_SS:
+        return "UNSOL_ON_SS";
+    case RIL_UNSOL_STK_CC_ALPHA_NOTIFY:
+        return "UNSOL_STK_CC_ALPHA_NOTIFY";
+    case RIL_UNSOL_LCEDATA_RECV:
+        return "UNSOL_LCEDATA_RECV";
+
     /* IMS unsolicited response */
     case RIL_UNSOL_RESPONSE_IMS_CALL_STATE_CHANGED:
         return "UNSOL_IMS_CALL_STATE_CHANGED";
@@ -2182,6 +2186,8 @@ std::string responseToString(int respid)
         return "UNSOL_RADIO_CAPABILITY_CHANGED";
     case RIL_EXT_UNSOL_EARLY_MEDIA:
         return "UNSOL_EARLY_MEDIA";
+    case RIL_EXT_UNSOL_ATROUTER_RSP:
+        return "RIL_EXT_UNSOL_ATROUTER_RSP";
     case RIL_EXT_UNSOL_DATA_PDP_INFO:
         return "UNSOL_DATA_PDP_INFO";
     case RIL_EXT_UNSOL_PPP_RSP:
@@ -2192,11 +2198,11 @@ std::string responseToString(int respid)
     case RIL_EXT_UNSOL_PHYSICAL_CHANNEL_CONFIG:
         return "EXT_UNSOL_PHYSICAL_CHANNEL_CONFIG";
     case RIL_EXT_UNSOL_NETWORK_SCAN_RESULT:
-        return "RIL_EXT_UNSOL_NETWORK_SCAN_RESULT";
+        return "EXT_UNSOL_NETWORK_SCAN_RESULT";
     case RIL_EXT_UNSOL_SIGNAL_STRENGTH:
-        return "RIL_EXT_UNSOL_SIGNAL_STRENGTH";
+        return "EXT_UNSOL_SIGNAL_STRENGTH";
     case RIL_EXT_UNSOL_SIGNAL_CONN_STATUS:
-        return "UNSOL_SIGNAL_CONN_STATUS";
+        return "EXT_UNSOL_SIGNAL_CONN_STATUS";
 #endif
     default:
         return "<unknown request>";

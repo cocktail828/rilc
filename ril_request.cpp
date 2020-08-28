@@ -28,8 +28,6 @@ std::string commandidToString(int cid)
 {
     switch (cid)
     {
-    case RIL_EXT_UNSOL_ATROUTER_RSP:
-        return "AT_ROUTER_RSP";
     case RIL_REQUEST_GET_SIM_STATUS:
         return "GET_SIM_STATUS";
     case RIL_REQUEST_ENTER_SIM_PIN:
@@ -242,8 +240,6 @@ std::string commandidToString(int cid)
         return "WRITE_SMS_TO_SIM";
     case RIL_REQUEST_GET_CELL_INFO_LIST:
         return "GET_CELL_INFO_LIST";
-    case RIL_REQUEST_SET_UNSOL_CELL_INFO_LIST_RATE:
-        return "SET_UNSOL_CELL_INFO_LIST_RATE";
     case RIL_REQUEST_SET_INITIAL_ATTACH_APN:
         return "RIL_REQUEST_SET_INITIAL_ATTACH_APN";
     case RIL_REQUEST_IMS_REGISTRATION_STATE:
@@ -664,7 +660,7 @@ void RILRequest::update(Parcel &p)
     /* oops! device manager is destroyed */
     if (p.dataSize() == 0)
     {
-        LOGW << "null response get, device connect may be broken" << ENDL;
+        LOGW << "null response get, polling thread may have exit" << ENDL;
     }
     else
     {
@@ -941,8 +937,7 @@ int RILRequest::dial(std::string address, int clirMode, RIL_UUS_Info *uusInfo)
 }
 
 /**
- * Be careful, insert SIM card, before call this function
- * or the rild will dump
+ * Be careful, insert SIM card, before call this function or the rild will dump
  */
 int RILRequest::getIMSI()
 {
@@ -2386,7 +2381,7 @@ void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
      * user will pass an nil rr->mResponse, which indicate the response is not that important
      * so, skip processing response
      */
-    if (rr->mResponse)
+    if (rr->mResponse == nullptr)
     {
         delete rr;
         LOGD << "skip parser response for user does not care about it" << ENDL;

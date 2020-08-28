@@ -69,33 +69,33 @@ int RILC_uninit()
 /**********************************************************************************/
 /************************** RILC UNSOCILITED PROCESSERS ***************************/
 /**********************************************************************************/
-void rilc_unsocilited_register(int cmdid, void (*cb)(RILResponse *))
+void RILC_unsocilitedRegister(int cmdid, void (*cb)(RILResponse *))
 {
     auto processer = rilcFindUnSocilitedProcesser(cmdid);
     if (processer)
     {
         processer->callback = cb;
-        LOGI << "register callback for unsocilited: "
-             << commandidToString(cmdid) << ENDL;
+        LOGI << "register callback for: "
+             << responseToString(cmdid) << ENDL;
     }
     else
     {
-        LOGE << "oops! cannot find handler for " << commandidToString(cmdid) << ENDL;
+        LOGE << "oops! cannot find handler for " << responseToString(cmdid) << ENDL;
     }
 }
 
-void rilc_unsocilited_deregister(int cmdid)
+void RILC_unsocilitedDeregister(int cmdid)
 {
     auto processer = rilcFindUnSocilitedProcesser(cmdid);
     if (processer)
     {
         processer->callback = nullptr;
-        LOGI << "deregister callback for unsocilited: "
-             << commandidToString(cmdid) << ENDL;
+        LOGI << "deregister callback for: "
+             << responseToString(cmdid) << ENDL;
     }
     else
     {
-        LOGE << "oops! cannot find handler for " << commandidToString(cmdid) << ENDL;
+        LOGE << "oops! cannot find handler for " << responseToString(cmdid) << ENDL;
     }
 }
 

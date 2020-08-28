@@ -23,8 +23,8 @@ int RILC_uninit();
 /***********************************************************/
 /***************** RILC UNSOCILITED PROCESSERS *************/
 /***********************************************************/
-void rilc_unsocilited_register(int cmdid, void (*cb)(RILResponse *));
-void rilc_unsocilited_deregister(int cmdid);
+void RILC_unsocilitedRegister(int cmdid, void (*cb)(RILResponse *));
+void RILC_unsocilitedDeregister(int cmdid);
 
 /***********************************************************/
 /***************** RILC STANDARD REQUESTS ******************/
