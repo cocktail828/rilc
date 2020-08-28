@@ -2455,7 +2455,7 @@ void RILRequest::processUnsolicited(Parcel &p)
             processer->responseParser(p, &resp);
             int *data = (int *)resp.responseData.array.data;
             mRilVersion = data[0];
-            set_ril_version(mRilVersion);
+            setRILVersion(mRilVersion);
             LOGI << "RILD version: " << mRilVersion << ENDL;
         }
     }

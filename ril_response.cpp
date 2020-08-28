@@ -118,7 +118,7 @@ static RILCProcesser SocilitedResponseProcesser[] = {
 
     /* request extension from unisoc */
     PROCESSER(RIL_REQUEST_VOICE_RADIO_TECH, responseInts),
-    PROCESSER(RIL_REQUEST_GET_CELL_INFO_LIST, responseCellInfoList), // TODO
+    PROCESSER(RIL_REQUEST_GET_CELL_INFO_LIST, responseCellInfoList),
     PROCESSER(RIL_REQUEST_SET_UNSOL_CELL_INFO_LIST_RATE, responseVoid),
     PROCESSER(RIL_REQUEST_SET_INITIAL_ATTACH_APN, responseVoid),
     PROCESSER(RIL_REQUEST_IMS_REGISTRATION_STATE, responseInts),
@@ -229,26 +229,27 @@ RILCProcesser *rilcFindUnSocilitedProcesser(int cmdid)
         v = nullptr;         \
     } while (0)
 
-#define ERROR_MALLOC0(v)                     \
-    do                                       \
-    {                                        \
-        if (!v)                              \
-        {                                    \
-            LOGE << "out of memory" << ENDL; \
-            return;                          \
-        }                                    \
-    } while (0);
+#define ERROR_MALLOC0(v, n)              \
+    if (!v)                              \
+    {                                    \
+        LOGE << "out of memory" << ENDL; \
+        return;                          \
+    }                                    \
+    else                                 \
+    {                                    \
+        memset(v, 0, n);                 \
+    }
 
-static int ril_version = 0;
+static int sg_rilVersion = 0;
 
-void set_ril_version(int ver)
+void setRILVersion(int ver)
 {
-    ril_version = ver;
+    sg_rilVersion = ver;
 }
 
-int get_ril_version()
+int getRILVersion()
 {
-    return ril_version;
+    return sg_rilVersion;
 }
 
 /***********************************************************************************/
@@ -268,8 +269,8 @@ void responseStrings(Parcel &p, RILResponse *resp)
     }
     else
     {
-        data = (const char **)malloc(num * sizeof(char **));
-        ERROR_MALLOC0(data);
+        const char **data = (const char **)malloc(num * sizeof(char **));
+        ERROR_MALLOC0(data, (num * sizeof(char **)));
         for (int i = 0; i < num; i++)
             data[i] = p.readString();
     }
@@ -330,7 +331,7 @@ void responseInts(Parcel &p, RILResponse *resp)
 
     int num = p.readInt32();
     int *data = (int *)malloc(num * sizeof(int));
-    ERROR_MALLOC0(data);
+    ERROR_MALLOC0(data, num * sizeof(int));
     for (int i = 0; i < num; i++)
         data[i] = p.readInt32();
 
@@ -383,7 +384,7 @@ void responseCallForward(Parcel &p, RILResponse *resp)
         return;
 
     RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)malloc(sizeof(RIL_SuppSvcNotification));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_SuppSvcNotification));
 
     response->notificationType = p.readInt32();
     response->code = p.readInt32();
@@ -428,7 +429,7 @@ void responseCdmaSms(Parcel &p, RILResponse *resp)
         return;
 
     RIL_CDMA_SMS_Message *response = (RIL_CDMA_SMS_Message *)malloc(sizeof(RIL_CDMA_SMS_Message));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_CDMA_SMS_Message));
 
     response->uTeleserviceID = p.readInt32();
     response->bIsServicePresent = p.readInt32();
@@ -454,9 +455,7 @@ void responseCdmaSms(Parcel &p, RILResponse *resp)
     response->uBearerDataLen = p.readInt32();
     // sms = SmsMessage.newFromParcel(p);
     for (digitCount = 0; digitCount < digitLimit; digitCount++)
-    {
         response->aBearerData[digitCount] = p.readInt32();
-    }
 
     resp->responseType = TYPE_STRUCT;
     resp->responseData.array.num = 1;
@@ -513,7 +512,7 @@ void responseRaw(Parcel &p, RILResponse *resp)
     else
     {
         response = (uint8_t *)malloc(response_len);
-        ERROR_MALLOC0(response);
+        ERROR_MALLOC0(response, response_len);
         memcpy(response, p.readInplace(response_len), response_len);
     }
 
@@ -546,7 +545,7 @@ void responseSMS(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
     RIL_SMS_Response *response = (RIL_SMS_Response *)malloc(sizeof(RIL_SMS_Response));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_SMS_Response));
 
     response->messageRef = p.readInt32();
     response->ackPDU = p.readString();
@@ -574,6 +573,8 @@ void responseSMSFree(RILResponse *resp)
     if (!resp)
         return;
 
+    RIL_SMS_Response *response = (RIL_SMS_Response *)resp->responseData.array.data;
+    SAFETYFREE(response->ackPDU);
     SAFETYFREE(resp->responseData.array.data);
 }
 
@@ -583,7 +584,7 @@ void responseICC_IO(Parcel &p, RILResponse *resp)
         return;
 
     RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)malloc(sizeof(RIL_SIM_IO_Response));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_SIM_IO_Response));
     response->sw1 = p.readInt32();
     response->sw2 = p.readInt32();
     response->simResponse = p.readString();
@@ -620,7 +621,7 @@ void responseIccCardStatus(Parcel &p, RILResponse *resp)
         return;
 
     RIL_CardStatus_v6 *response = (RIL_CardStatus_v6 *)malloc(sizeof(RIL_CardStatus_v6));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_CardStatus_v6));
 
     response->card_state = static_cast<RIL_CardState>(p.readInt32());
     response->universal_pin_state = static_cast<RIL_PinState>(p.readInt32());
@@ -691,7 +692,7 @@ void responseCallList(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
     RIL_Call *response = (RIL_Call *)malloc(sizeof(RIL_Call) * num);
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_Call) * num);
 
     for (int i = 0; i < num; i++)
     {
@@ -771,7 +772,6 @@ void responseCallListFree(RILResponse *resp)
 
     int num = resp->responseData.array.num;
     RIL_Call *response = (RIL_Call *)resp->responseData.array.data;
-    LOGI << "UNMARSHALL: num of struct = " << num << ENDL;
     for (int i = 0; i < num; i++)
     {
         SAFETYFREE(response[i].number);
@@ -793,7 +793,7 @@ void responseDataCallList(Parcel &p, RILResponse *resp)
         return;
 
     RIL_Data_Call_Response_v9 *response = (RIL_Data_Call_Response_v9 *)malloc(sizeof(RIL_Data_Call_Response_v9) * num);
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_Data_Call_Response_v9) * num);
     (void)dontCare;
     for (int i = 0; i < num; i++)
     {
@@ -893,7 +893,7 @@ void responseCellList(Parcel &p, RILResponse *resp)
 
     int num = p.readInt32();
     RIL_NeighboringCell *response = (RIL_NeighboringCell *)malloc(num * sizeof(RIL_NeighboringCell));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, num * sizeof(RIL_NeighboringCell));
     for (int i = 0; i < num; i++)
     {
         response[i].rssi = p.readInt32();
@@ -955,7 +955,7 @@ void responseGmsBroadcastConfig(Parcel &p, RILResponse *resp)
 
     int num = p.readInt32();
     RIL_GSM_BroadcastSmsConfigInfo *response = (RIL_GSM_BroadcastSmsConfigInfo *)malloc(num * sizeof(RIL_GSM_BroadcastSmsConfigInfo));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, num * sizeof(RIL_GSM_BroadcastSmsConfigInfo));
 
     for (int i = 0; i < num; i++)
     {
@@ -1003,7 +1003,7 @@ void responseCdmaBroadcastConfig(Parcel &p, RILResponse *resp)
 
     int num = p.readInt32();
     RIL_CDMA_BroadcastSmsConfigInfo *response = (RIL_CDMA_BroadcastSmsConfigInfo *)malloc(num * sizeof(RIL_CDMA_BroadcastSmsConfigInfo));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, num * sizeof(RIL_CDMA_BroadcastSmsConfigInfo));
 
     for (int i = 0; i < num; i++)
     {
@@ -1045,7 +1045,7 @@ void responseSignalStrength(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
     RIL_SignalStrength_v10 *response = (RIL_SignalStrength_v10 *)malloc(sizeof(RIL_SignalStrength_v10));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_SignalStrength_v10));
     response->GW_SignalStrength.signalStrength = p.readInt32();
     response->GW_SignalStrength.bitErrorRate = p.readInt32();
     response->CDMA_SignalStrength.dbm = p.readInt32();
@@ -1100,61 +1100,221 @@ void responseCdmaInformationRecord(Parcel &p, RILResponse *resp)
 {
     if (!resp)
         return;
+
+    // int num = p.readInt32();
+    // RIL_CDMA_InformationRecords *response = (RIL_CDMA_InformationRecords *)malloc(num * sizeof(RIL_CDMA_InformationRecords));
+    // ERROR_MALLOC0(response, num * sizeof(RIL_CDMA_InformationRecords));
+
+    // for (int i = 0; i < num; i++)
+    // {
+    //     RIL_CDMA_InformationRecord *infoRec = &response->infoRec[i];
+    //     infoRec->name = static_cast<RIL_CDMA_InfoRecName>(p.readInt32());
+    //     switch (infoRec->name)
+    //     {
+    //     case RIL_CDMA_DISPLAY_INFO_REC:
+    //     case RIL_CDMA_EXTENDED_DISPLAY_INFO_REC:
+    //     {
+    //         if (infoRec->rec.display.alpha_len > CDMA_ALPHA_INFO_BUFFER_LENGTH)
+    //         {
+    //             return RIL_ERRNO_INVALID_RESPONSE;
+    //         }
+    //         string8 = (char *)malloc((infoRec->rec.display.alpha_len + 1) * sizeof(char));
+    //         for (int i = 0; i < infoRec->rec.display.alpha_len; i++)
+    //         {
+    //             string8[i] = infoRec->rec.display.alpha_buf[i];
+    //         }
+    //         string8[(int)infoRec->rec.display.alpha_len] = '\0';
+    //         writeStringToParcel(p, (const char *)string8);
+    //         free(string8);
+    //         string8 = NULL;
+    //         break;
+    //     }
+    //     case RIL_CDMA_CALLED_PARTY_NUMBER_INFO_REC:
+    //     case RIL_CDMA_CALLING_PARTY_NUMBER_INFO_REC:
+    //     case RIL_CDMA_CONNECTED_NUMBER_INFO_REC:
+    //     {
+    //         if (infoRec->rec.number.len > CDMA_NUMBER_INFO_BUFFER_LENGTH)
+    //         {
+    //             RLOGE("invalid display info response length %d expected not more than %d\n",
+    //                   (int)infoRec->rec.number.len,
+    //                   CDMA_NUMBER_INFO_BUFFER_LENGTH);
+    //             return RIL_ERRNO_INVALID_RESPONSE;
+    //         }
+    //         string8 = (char *)malloc((infoRec->rec.number.len + 1) * sizeof(char));
+    //         for (int i = 0; i < infoRec->rec.number.len; i++)
+    //         {
+    //             string8[i] = infoRec->rec.number.buf[i];
+    //         }
+    //         string8[(int)infoRec->rec.number.len] = '\0';
+    //         writeStringToParcel(p, (const char *)string8);
+    //         free(string8);
+    //         string8 = NULL;
+    //         p.readInt32(infoRec->rec.number.number_type);
+    //         p.readInt32(infoRec->rec.number.number_plan);
+    //         p.readInt32(infoRec->rec.number.pi);
+    //         p.readInt32(infoRec->rec.number.si);
+    //         break;
+    //     }
+    //     case RIL_CDMA_SIGNAL_INFO_REC:
+    //     {
+    //         p.readInt32(infoRec->rec.signal.isPresent);
+    //         p.readInt32(infoRec->rec.signal.signalType);
+    //         p.readInt32(infoRec->rec.signal.alertPitch);
+    //         p.readInt32(infoRec->rec.signal.signal);
+
+    //         appendPrintBuf("%sisPresent = %X, signalType = %X, alertPitch = %X, signal = %X, ",
+    //                        printBuf, (int)infoRec->rec.signal.isPresent,
+    //                        (int)infoRec->rec.signal.signalType,
+    //                        (int)infoRec->rec.signal.alertPitch,
+    //                        (int)infoRec->rec.signal.signal);
+    //         removeLastChar;
+    //         break;
+    //     }
+    //     case RIL_CDMA_REDIRECTING_NUMBER_INFO_REC:
+    //     {
+    //         if (infoRec->rec.redir.redirectingNumber.len >
+    //             CDMA_NUMBER_INFO_BUFFER_LENGTH)
+    //         {
+    //             RLOGE("invalid display info response length %d expected not more than %d\n",
+    //                   (int)infoRec->rec.redir.redirectingNumber.len,
+    //                   CDMA_NUMBER_INFO_BUFFER_LENGTH);
+    //             return RIL_ERRNO_INVALID_RESPONSE;
+    //         }
+    //         string8 = (char *)malloc((infoRec->rec.redir.redirectingNumber
+    //                                       .len +
+    //                                   1) *
+    //                                  sizeof(char));
+    //         for (int i = 0; i < infoRec->rec.redir.redirectingNumber.len;
+    //              i++)
+    //         {
+    //             string8[i] = infoRec->rec.redir.redirectingNumber.buf[i];
+    //         }
+    //         string8[(int)infoRec->rec.redir.redirectingNumber.len] = '\0';
+    //         writeStringToParcel(p, (const char *)string8);
+    //         free(string8);
+    //         string8 = NULL;
+    //         p.readInt32(infoRec->rec.redir.redirectingNumber.number_type);
+    //         p.readInt32(infoRec->rec.redir.redirectingNumber.number_plan);
+    //         p.readInt32(infoRec->rec.redir.redirectingNumber.pi);
+    //         p.readInt32(infoRec->rec.redir.redirectingNumber.si);
+    //         p.readInt32(infoRec->rec.redir.redirectingReason);
+    //         break;
+    //     }
+    //     case RIL_CDMA_LINE_CONTROL_INFO_REC:
+    //     {
+    //         p.readInt32(infoRec->rec.lineCtrl.lineCtrlPolarityIncluded);
+    //         p.readInt32(infoRec->rec.lineCtrl.lineCtrlToggle);
+    //         p.readInt32(infoRec->rec.lineCtrl.lineCtrlReverse);
+    //         p.readInt32(infoRec->rec.lineCtrl.lineCtrlPowerDenial);
+
+    //         appendPrintBuf("%slineCtrlPolarityIncluded = %d, lineCtrlToggle = %d, lineCtrlReverse = %d, lineCtrlPowerDenial = %d, ",
+    //                        printBuf,
+    //                        (int)infoRec->rec.lineCtrl.lineCtrlPolarityIncluded,
+    //                        (int)infoRec->rec.lineCtrl.lineCtrlToggle,
+    //                        (int)infoRec->rec.lineCtrl.lineCtrlReverse,
+    //                        (int)infoRec->rec.lineCtrl.lineCtrlPowerDenial);
+    //         removeLastChar;
+    //         break;
+    //     }
+    //     case RIL_CDMA_T53_CLIR_INFO_REC:
+    //     {
+    //         p.readInt32((int)(infoRec->rec.clir.cause));
+
+    //         appendPrintBuf("%scause%d", printBuf, infoRec->rec.clir.cause);
+    //         removeLastChar;
+    //         break;
+    //     }
+    //     case RIL_CDMA_T53_AUDIO_CONTROL_INFO_REC:
+    //     {
+    //         p.readInt32(infoRec->rec.audioCtrl.upLink);
+    //         p.readInt32(infoRec->rec.audioCtrl.downLink);
+
+    //         appendPrintBuf("%supLink=%d, downLink=%d, ", printBuf,
+    //                        infoRec->rec.audioCtrl.upLink,
+    //                        infoRec->rec.audioCtrl.downLink);
+    //         removeLastChar;
+    //         break;
+    //     }
+    //     case RIL_CDMA_T53_RELEASE_INFO_REC:
+    //         // TODO(Moto): See David Krause, he has the answer:)
+    //         RLOGE("RIL_CDMA_T53_RELEASE_INFO_REC: return INVALID_RESPONSE");
+    //         return RIL_ERRNO_INVALID_RESPONSE;
+    //     default:
+    //         RLOGE("Incorrect name value");
+    //         return RIL_ERRNO_INVALID_RESPONSE;
+    //     }
+    // }
+    LOGI << __func__ << " has not been implement yet" << ENDL;
 }
 
 void responseCdmaInformationRecordShow(RILResponse *resp)
 {
+    LOGI << __func__ << " has not been implement yet" << ENDL;
     if (!resp)
         return;
 }
 
 void responseCdmaInformationRecordFree(RILResponse *resp)
 {
+    LOGI << __func__ << " has not been implement yet" << ENDL;
     if (!resp)
         return;
+}
+
+/**
+ * Marshall the signalInfoRecord into the parcel if it exists.
+ */
+static void unmarshallSignalInfoRecord(Parcel &p, RIL_CDMA_SignalInfoRecord &p_signalInfoRecord)
+{
+    p_signalInfoRecord.isPresent = p.readInt32();
+    p_signalInfoRecord.signalType = p.readInt32();
+    p_signalInfoRecord.alertPitch = p.readInt32();
+    p_signalInfoRecord.signal = p.readInt32();
 }
 
 void responseCdmaCallWaiting(Parcel &p, RILResponse *resp)
 {
     if (!resp)
         return;
-    // RIL_CDMA_CallWaiting_v6 *response = (RIL_CDMA_CallWaiting_v6 *)malloc(sizeof(RIL_CDMA_CallWaiting_v6));
 
-    // response->number = p.readString();
-    // response->numberPresentation = p.readInt32();
-    // response->name = p.readString();
-    // marshallSignalInfoRecord(p, response->signalInfoRecord);
+    RIL_CDMA_CallWaiting_v6 *response = (RIL_CDMA_CallWaiting_v6 *)malloc(sizeof(RIL_CDMA_CallWaiting_v6));
+    ERROR_MALLOC0(response, sizeof(RIL_CDMA_CallWaiting_v6));
 
-    // if (s_callbacks.version <= LAST_IMPRECISE_RIL_VERSION)
-    // {
-    //     if (responselen >= sizeof(RIL_CDMA_CallWaiting_v6))
-    //     {
-    //         p.readInt32(response->number_type);
-    //         p.readInt32(response->number_plan);
-    //     }
-    //     else
-    //     {
-    //         p.readInt32(0);
-    //         p.readInt32(0);
-    //     }
-    // }
-    // else
-    // { // RIL version >= 13
-    //     p.readInt32(response->number_type);
-    //     p.readInt32(response->number_plan);
-    // }
+    response->number = p.readString();
+    response->numberPresentation = p.readInt32();
+    response->name = p.readString();
+
+    unmarshallSignalInfoRecord(p, response->signalInfoRecord);
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
 }
 
 void responseCdmaCallWaitingShow(RILResponse *resp)
 {
     if (!resp)
         return;
+
+    RIL_CDMA_CallWaiting_v6 *response = (RIL_CDMA_CallWaiting_v6 *)resp->responseData.array.data;
+    LOGI << "  number = " << NULLSTR(response->number) << ENDL;
+    LOGI << "  numberPresentation = " << response->numberPresentation << ENDL;
+    LOGI << "  name = " << NULLSTR(response->name) << ENDL;
+    LOGI << "  signalInfoRecord.isPresent  = " << response->signalInfoRecord.isPresent << ENDL;
+    LOGI << "  signalInfoRecord.signalType = " << response->signalInfoRecord.signalType << ENDL;
+    LOGI << "  signalInfoRecord.alertPitch = " << response->signalInfoRecord.alertPitch << ENDL;
+    LOGI << "  signalInfoRecord.signal     = " << response->signalInfoRecord.signal << ENDL;
 }
 
 void responseCdmaCallWaitingFree(RILResponse *resp)
 {
     if (!resp)
         return;
+
+    RIL_CDMA_CallWaiting_v6 *response = (RIL_CDMA_CallWaiting_v6 *)resp->responseData.array.data;
+    SAFETYFREE(response->name);
+    SAFETYFREE(response->number);
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseCallRing(Parcel &p, RILResponse *resp)
@@ -1162,7 +1322,7 @@ void responseCallRing(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
     RIL_CDMA_SignalInfoRecord *response = (RIL_CDMA_SignalInfoRecord *)malloc(sizeof(RIL_CDMA_SignalInfoRecord));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_CDMA_SignalInfoRecord));
 
     response->isPresent = p.readInt32();
     response->signalType = p.readInt32();
@@ -1193,22 +1353,238 @@ void responseCallRingFree(RILResponse *resp)
     SAFETYFREE(resp->responseData.array.data);
 }
 
-void responseCellInfoList(Parcel &p, RILResponse *resp)
+void responseCellInfoListV6(Parcel &p, RILResponse *resp)
 {
     if (!resp)
         return;
+
+    int num = p.readInt32();
+    RIL_CellInfo *response = (RIL_CellInfo *)malloc(num * sizeof(RIL_CellInfo));
+    ERROR_MALLOC0(response, num * sizeof(RIL_CellInfo));
+
+    for (int i = 0; i < num; i++)
+    {
+        response[i].cellInfoType = static_cast<RIL_CellInfoType>(p.readInt32());
+        response[i].registered = p.readInt32();
+        response[i].timeStampType = static_cast<RIL_TimeStampType>(p.readInt32());
+        response[i].timeStamp = p.readInt64();
+        switch (response[i].cellInfoType)
+        {
+        case RIL_CELL_INFO_TYPE_GSM:
+        {
+            response[i].CellInfo.gsm.cellIdentityGsm.mcc = p.readInt32();
+            response[i].CellInfo.gsm.cellIdentityGsm.mnc = p.readInt32();
+            response[i].CellInfo.gsm.cellIdentityGsm.lac = p.readInt32();
+            response[i].CellInfo.gsm.cellIdentityGsm.cid = p.readInt32();
+            response[i].CellInfo.gsm.signalStrengthGsm.signalStrength = p.readInt32();
+            response[i].CellInfo.gsm.signalStrengthGsm.bitErrorRate = p.readInt32();
+            break;
+        }
+        case RIL_CELL_INFO_TYPE_WCDMA:
+        {
+            response[i].CellInfo.wcdma.cellIdentityWcdma.mcc = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.mnc = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.lac = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.cid = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.psc = p.readInt32();
+            response[i].CellInfo.wcdma.signalStrengthWcdma.signalStrength = p.readInt32();
+            response[i].CellInfo.wcdma.signalStrengthWcdma.bitErrorRate = p.readInt32();
+            break;
+        }
+        case RIL_CELL_INFO_TYPE_CDMA:
+        {
+            response[i].CellInfo.cdma.cellIdentityCdma.networkId = p.readInt32();
+            response[i].CellInfo.cdma.cellIdentityCdma.systemId = p.readInt32();
+            response[i].CellInfo.cdma.cellIdentityCdma.basestationId = p.readInt32();
+            response[i].CellInfo.cdma.cellIdentityCdma.longitude = p.readInt32();
+            response[i].CellInfo.cdma.cellIdentityCdma.latitude = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthCdma.dbm = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthCdma.ecio = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthEvdo.dbm = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthEvdo.ecio = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthEvdo.signalNoiseRatio = p.readInt32();
+            break;
+        }
+        case RIL_CELL_INFO_TYPE_LTE:
+        {
+            response[i].CellInfo.lte.cellIdentityLte.mcc = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.mnc = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.ci = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.pci = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.tac = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.signalStrength = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.rsrp = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.rsrq = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.rssnr = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.cqi = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.timingAdvance = p.readInt32();
+            break;
+        }
+        case RIL_CELL_INFO_TYPE_TD_SCDMA:
+        {
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.mcc = p.readInt32();
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.mnc = p.readInt32();
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.lac = p.readInt32();
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.cid = p.readInt32();
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.cpid = p.readInt32();
+            response[i].CellInfo.tdscdma.signalStrengthTdscdma.rscp = p.readInt32();
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = num;
+    resp->responseData.array.data = response;
+}
+
+void responseCellInfoListV6Show(RILResponse *resp)
+{
+    LOGI << __func__ << " has not been implement yet" << ENDL;
+}
+
+void responseCellInfoListV12(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    int num = p.readInt32();
+    RIL_CellInfo_v12 *response = (RIL_CellInfo_v12 *)malloc(num * sizeof(RIL_CellInfo_v12));
+    ERROR_MALLOC0(response, num * sizeof(RIL_CellInfo_v12));
+
+    for (int i = 0; i < num; i++)
+    {
+        response[i].cellInfoType = static_cast<RIL_CellInfoType>(p.readInt32());
+        response[i].registered = p.readInt32();
+        response[i].timeStampType = static_cast<RIL_TimeStampType>(p.readInt32());
+        response[i].timeStamp = p.readInt64();
+        switch (response[i].cellInfoType)
+        {
+        case RIL_CELL_INFO_TYPE_GSM:
+        {
+            response[i].CellInfo.gsm.cellIdentityGsm.mcc = p.readInt32();
+            response[i].CellInfo.gsm.cellIdentityGsm.mnc = p.readInt32();
+            response[i].CellInfo.gsm.cellIdentityGsm.mnc_digit = p.readInt32();
+            response[i].CellInfo.gsm.cellIdentityGsm.lac = p.readInt32();
+            response[i].CellInfo.gsm.cellIdentityGsm.cid = p.readInt32();
+            response[i].CellInfo.gsm.cellIdentityGsm.arfcn = p.readInt32();
+            response[i].CellInfo.gsm.cellIdentityGsm.bsic = p.readInt32();
+            response[i].CellInfo.gsm.signalStrengthGsm.signalStrength = p.readInt32();
+            response[i].CellInfo.gsm.signalStrengthGsm.bitErrorRate = p.readInt32();
+            response[i].CellInfo.gsm.signalStrengthGsm.timingAdvance = p.readInt32();
+            break;
+        }
+        case RIL_CELL_INFO_TYPE_WCDMA:
+        {
+            response[i].CellInfo.wcdma.cellIdentityWcdma.mcc = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.mnc = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.mnc_digit = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.lac = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.cid = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.psc = p.readInt32();
+            response[i].CellInfo.wcdma.cellIdentityWcdma.uarfcn = p.readInt32();
+            response[i].CellInfo.wcdma.signalStrengthWcdma.signalStrength = p.readInt32();
+            response[i].CellInfo.wcdma.signalStrengthWcdma.bitErrorRate = p.readInt32();
+            break;
+        }
+        case RIL_CELL_INFO_TYPE_CDMA:
+        {
+            response[i].CellInfo.cdma.cellIdentityCdma.networkId = p.readInt32();
+            response[i].CellInfo.cdma.cellIdentityCdma.systemId = p.readInt32();
+            response[i].CellInfo.cdma.cellIdentityCdma.basestationId = p.readInt32();
+            response[i].CellInfo.cdma.cellIdentityCdma.longitude = p.readInt32();
+            response[i].CellInfo.cdma.cellIdentityCdma.latitude = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthCdma.dbm = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthCdma.ecio = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthEvdo.dbm = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthEvdo.ecio = p.readInt32();
+            response[i].CellInfo.cdma.signalStrengthEvdo.signalNoiseRatio = p.readInt32();
+            break;
+        }
+        case RIL_CELL_INFO_TYPE_LTE:
+        {
+            response[i].CellInfo.lte.cellIdentityLte.mcc = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.mnc = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.mnc_digit = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.ci = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.pci = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.tac = p.readInt32();
+            response[i].CellInfo.lte.cellIdentityLte.earfcn = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.signalStrength = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.rsrp = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.rsrq = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.rssnr = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.cqi = p.readInt32();
+            response[i].CellInfo.lte.signalStrengthLte.timingAdvance = p.readInt32();
+            break;
+        }
+        case RIL_CELL_INFO_TYPE_TD_SCDMA:
+        {
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.mcc = p.readInt32();
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.mnc = p.readInt32();
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.mnc_digit = p.readInt32();
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.lac = p.readInt32();
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.cid = p.readInt32();
+            response[i].CellInfo.tdscdma.cellIdentityTdscdma.cpid = p.readInt32();
+            response[i].CellInfo.tdscdma.signalStrengthTdscdma.rscp = p.readInt32();
+            break;
+        }
+#ifdef ORCA_FEATURE_5G
+        case RIL_CELL_INFO_TYPE_NR:
+        {
+            response[i].CellInfo.nr.cellIdentityNr.mcc = p.readInt32();
+            response[i].CellInfo.nr.cellIdentityNr.mnc = p.readInt32();
+            response[i].CellInfo.nr.cellIdentityNr.mnc_digit = p.readInt32();
+            response[i].CellInfo.nr.cellIdentityNr.pci = p.readInt32();
+            response[i].CellInfo.nr.cellIdentityNr.tac = p.readInt32();
+            response[i].CellInfo.nr.cellIdentityNr.nrarfcn = p.readInt32();
+            response[i].CellInfo.nr.cellIdentityNr.nci = p.readInt64();
+            response[i].CellInfo.nr.signalStrengthNr.csiRsrp = p.readInt32();
+            response[i].CellInfo.nr.signalStrengthNr.csiRsrq = p.readInt32();
+            response[i].CellInfo.nr.signalStrengthNr.csiSinr = p.readInt32();
+            response[i].CellInfo.nr.signalStrengthNr.ssRsrp = p.readInt32();
+            response[i].CellInfo.nr.signalStrengthNr.ssRsrq = p.readInt32();
+            response[i].CellInfo.nr.signalStrengthNr.ssSinr = p.readInt32();
+        }
+#endif
+        default:
+            break;
+        }
+    }
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = num;
+    resp->responseData.array.data = response;
+}
+
+void responseCellInfoListV12Show(RILResponse *resp)
+{
+    LOGI << __func__ << " has not been implement yet" << ENDL;
+}
+
+void responseCellInfoList(Parcel &p, RILResponse *resp)
+{
+    if (getRILVersion() < LAST_IMPRECISE_RIL_VERSION)
+        responseCellInfoListV6(p, resp);
+    else
+        responseCellInfoListV12(p, resp);
 }
 
 void responseCellInfoListShow(RILResponse *resp)
 {
-    if (!resp)
-        return;
+    if (getRILVersion() < LAST_IMPRECISE_RIL_VERSION)
+        responseCellInfoListV6Show(resp);
+    else
+        responseCellInfoListV12Show(resp);
 }
 
 void responseCellInfoListFree(RILResponse *resp)
 {
     if (!resp)
         return;
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseSIM_IO(Parcel &p, RILResponse *resp)
@@ -1216,7 +1592,7 @@ void responseSIM_IO(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
     RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)malloc(sizeof(RIL_SIM_IO_Response));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_SIM_IO_Response));
 
     response->sw1 = p.readInt32();
     response->sw2 = p.readInt32();
@@ -1243,6 +1619,9 @@ void responseSIM_IOFree(RILResponse *resp)
 {
     if (!resp)
         return;
+
+    RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)resp->responseData.array.data;
+    SAFETYFREE(response->simResponse);
     SAFETYFREE(resp->responseData.array.data);
 }
 
@@ -1252,7 +1631,7 @@ void responseHardwareConfig(Parcel &p, RILResponse *resp)
         return;
     int num = p.readInt32();
     RIL_HardwareConfig *response = (RIL_HardwareConfig *)malloc(num * sizeof(RIL_HardwareConfig));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, num * sizeof(RIL_HardwareConfig));
 
     for (int i = 0; i < num; i++)
     {
@@ -1338,7 +1717,10 @@ void responseDcRtInfo(Parcel &p, RILResponse *resp)
 {
     if (!resp)
         return;
+
     RIL_DcRtInfo *response = (RIL_DcRtInfo *)malloc(sizeof(RIL_DcRtInfo));
+    ERROR_MALLOC0(response, sizeof(RIL_DcRtInfo));
+
     response->time = p.readInt64();
     response->powerState = static_cast<RIL_DcPowerStates>(p.readInt32());
 
@@ -1370,6 +1752,8 @@ void responseRadioCapability(Parcel &p, RILResponse *resp)
         return;
 
     RIL_RadioCapability *response = (RIL_RadioCapability *)malloc(sizeof(RIL_RadioCapability));
+    ERROR_MALLOC0(response, sizeof(RIL_RadioCapability));
+
     response->version = p.readInt32();
     response->session = p.readInt32();
     response->phase = p.readInt32();
@@ -1405,9 +1789,10 @@ void responseLceStatus(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
     RIL_LceStatusInfo *response = (RIL_LceStatusInfo *)malloc(sizeof(RIL_LceStatusInfo));
+    ERROR_MALLOC0(response, sizeof(RIL_LceStatusInfo));
+
     p.read((void *)response, 1); // response->lce_status takes one byte.
     response->actual_interval_ms = p.readInt32();
-
     resp->responseType = TYPE_STRUCT;
     resp->responseData.array.num = 1;
     resp->responseData.array.data = response;
@@ -1434,7 +1819,7 @@ void responseLceData(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
     RIL_LceDataInfo *response = (RIL_LceDataInfo *)malloc(sizeof(RIL_LceDataInfo));
-    ERROR_MALLOC0(response);
+    ERROR_MALLOC0(response, sizeof(RIL_LceDataInfo));
 
     response->last_hop_capacity_kbps = p.readInt32();
     p.read((void *)&(response->confidence_level), 1);
@@ -1467,12 +1852,18 @@ void responseActivityData(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
 
-    RIL_ActivityStatsInfo *response = (RIL_ActivityStatsInfo *)response;
+    RIL_ActivityStatsInfo *response = (RIL_ActivityStatsInfo *)malloc(sizeof(RIL_ActivityStatsInfo));
+    ERROR_MALLOC0(response, sizeof(RIL_ActivityStatsInfo));
+
     response->sleep_mode_time_ms = p.readInt32();
     response->idle_mode_time_ms = p.readInt32();
     for (int i = 0; i < RIL_NUM_TX_POWER_LEVELS; i++)
         response->tx_mode_time_ms[i] = p.readInt32();
     response->rx_mode_time_ms = p.readInt32();
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
 }
 
 void responseActivityDataShow(RILResponse *resp)
@@ -1485,10 +1876,6 @@ void responseActivityDataShow(RILResponse *resp)
     for (int i = 0; i < RIL_NUM_TX_POWER_LEVELS; i++)
         LOGI << "  [" << i << "].idle_mode_time_ms = " << response->tx_mode_time_ms[i] << ENDL;
     LOGI << "  rx_mode_time_ms = " << response->rx_mode_time_ms << ENDL;
-
-    resp->responseType = TYPE_STRUCT;
-    resp->responseData.array.num = 1;
-    resp->responseData.array.data = response;
 }
 
 void responseActivityDataFree(RILResponse *resp)
@@ -1498,22 +1885,107 @@ void responseActivityDataFree(RILResponse *resp)
     SAFETYFREE(resp->responseData.array.data);
 }
 
+static bool isServiceTypeCfQuery(RIL_SsServiceType serType, RIL_SsRequestType reqType)
+{
+    if ((reqType == SS_INTERROGATION) &&
+        (serType == SS_CFU ||
+         serType == SS_CF_BUSY ||
+         serType == SS_CF_NO_REPLY ||
+         serType == SS_CF_NOT_REACHABLE ||
+         serType == SS_CF_ALL ||
+         serType == SS_CF_ALL_CONDITIONAL))
+        return true;
+    return false;
+}
+
 void responseSSData(Parcel &p, RILResponse *resp)
 {
     if (!resp)
         return;
+
+    RIL_StkCcUnsolSsResponse *response = (RIL_StkCcUnsolSsResponse *)malloc(sizeof(RIL_StkCcUnsolSsResponse));
+    ERROR_MALLOC0(response, sizeof(RIL_StkCcUnsolSsResponse));
+
+    response->serviceType = static_cast<RIL_SsServiceType>(p.readInt32());
+    response->requestType = static_cast<RIL_SsRequestType>(p.readInt32());
+    response->teleserviceType = static_cast<RIL_SsTeleserviceType>(p.readInt32());
+    response->serviceClass = p.readInt32();
+    response->result = static_cast<RIL_Errno>(p.readInt32());
+    if (isServiceTypeCfQuery(response->serviceType, response->requestType))
+    {
+        /* number of call info's */
+        response->cfData.numValidIndexes = p.readInt32();
+        for (int i = 0; i < response->cfData.numValidIndexes; i++)
+        {
+            RIL_CallForwardInfo &cf = response->cfData.cfInfo[i];
+            cf.status = p.readInt32();
+            cf.reason = p.readInt32();
+            cf.serviceClass = p.readInt32();
+            cf.toa = p.readInt32();
+            cf.number = p.readString();
+            cf.timeSeconds = p.readInt32();
+        }
+    }
+    else
+    {
+        /* each int*/
+        for (int i = 0; i < SS_INFO_MAX; i++)
+            response->ssInfo[i] = p.readInt32();
+    }
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
 }
 
 void responseSSDataShow(RILResponse *resp)
 {
     if (!resp)
         return;
+
+    RIL_StkCcUnsolSsResponse *response = (RIL_StkCcUnsolSsResponse *)resp->responseData.array.data;
+    LOGI << "  serviceType = " << response->serviceType << ENDL;
+    LOGI << "  requestType = " << response->requestType << ENDL;
+    LOGI << "  teleserviceType = " << response->teleserviceType << ENDL;
+    LOGI << "  serviceClass = " << response->serviceClass << ENDL;
+    LOGI << "  result = " << response->result << ENDL;
+    if (isServiceTypeCfQuery(response->serviceType, response->requestType))
+    {
+        /* number of call info's */
+        for (int i = 0; i < response->cfData.numValidIndexes; i++)
+        {
+            RIL_CallForwardInfo &cf = response->cfData.cfInfo[i];
+            LOGI << "  [" << i << "].cfData.cfInfo.status = " << cf.status << ENDL;
+            LOGI << "  [" << i << "].cfData.cfInfo.reason = " << cf.reason << ENDL;
+            LOGI << "  [" << i << "].cfData.cfInfo.serviceClass = " << cf.serviceClass << ENDL;
+            LOGI << "  [" << i << "].cfData.cfInfo.toa = " << cf.toa << ENDL;
+            LOGI << "  [" << i << "].cfData.cfInfo.number = " << NULLSTR(cf.number) << ENDL;
+            LOGI << "  [" << i << "].cfData.cfInfo.timeSeconds = " << cf.timeSeconds << ENDL;
+        }
+    }
+    else
+    {
+        /* each int*/
+        for (int i = 0; i < SS_INFO_MAX; i++)
+            LOGI << "  ssInfo[" << i << "] = " << response->ssInfo[i] << ENDL;
+    }
 }
 
 void responseSSDataFree(RILResponse *resp)
 {
     if (!resp)
         return;
+
+    RIL_StkCcUnsolSsResponse *response = (RIL_StkCcUnsolSsResponse *)resp->responseData.array.data;
+    if (isServiceTypeCfQuery(response->serviceType, response->requestType))
+    {
+        for (int i = 0; i < response->cfData.numValidIndexes; i++)
+        {
+            RIL_CallForwardInfo &cf = response->cfData.cfInfo[i];
+            SAFETYFREE(cf.number);
+        }
+    }
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseSsn(Parcel &p, RILResponse *resp)
@@ -1521,6 +1993,8 @@ void responseSsn(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
     RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)malloc(sizeof(RIL_SuppSvcNotification));
+    ERROR_MALLOC0(response, sizeof(RIL_SuppSvcNotification));
+
     response->notificationType = p.readInt32();
     response->code = p.readInt32();
     response->index = p.readInt32();

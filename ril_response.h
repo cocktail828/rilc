@@ -10,10 +10,11 @@
 #include "parcel/parcel.h"
 #include "rilc_interface.h"
 
+#define LAST_IMPRECISE_RIL_VERSION 12
 std::string responseToString(int respid);
 
-void set_ril_version(int ver);
-int get_ril_version();
+void setRILVersion(int ver);
+int getRILVersion();
 
 void responseStrings(Parcel &p, RILResponse *resp);
 void responseStringsShow(RILResponse *resp);

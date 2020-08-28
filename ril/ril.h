@@ -809,14 +809,14 @@ typedef struct
                                  * 4 = erasure
                                  */
 
-    int reason;       /* from TS 27.007 7.11 "reason" */
-    int serviceClass; /* From 27.007 +CCFC/+CLCK "class"
+    int reason;         /* from TS 27.007 7.11 "reason" */
+    int serviceClass;   /* From 27.007 +CCFC/+CLCK "class"
                                     See table for Android mapping from
                                     MMI service code
                                     0 means user doesn't input class */
-    int toa;          /* "type" from TS 27.007 7.11 */
-    char *number;     /* "number" from TS 27.007 7.11. May be NULL */
-    int timeSeconds;  /* for CF no reply only */
+    int toa;            /* "type" from TS 27.007 7.11 */
+    const char *number; /* "number" from TS 27.007 7.11. May be NULL */
+    int timeSeconds;    /* for CF no reply only */
 } RIL_CallForwardInfo;
 
 typedef struct
