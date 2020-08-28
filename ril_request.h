@@ -261,7 +261,7 @@ public:
 
     int resetRadio();
 
-    int invokeOemRILRequestRaw(uint8_t *data);
+    int invokeOemRILRequestRaw(uint8_t *data, int len);
 
     int invokeOemRILRequestStrings(std::vector<std::string> strings);
 

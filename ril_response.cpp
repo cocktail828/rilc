@@ -3,6 +3,223 @@
 #include "ril_response.h"
 #include "logger.h"
 
+#define PROCESSER(i, v) \
+    RILCProcesser { i, v, v##Show, v##Free }
+
+/* socilited response handlers */
+static RILCProcesser SocilitedResponseProcesser[] = {
+    PROCESSER(RIL_REQUEST_GET_SIM_STATUS, responseIccCardStatus),
+    PROCESSER(RIL_REQUEST_ENTER_SIM_PIN, responseInts),
+    PROCESSER(RIL_REQUEST_ENTER_SIM_PUK, responseInts),
+    PROCESSER(RIL_REQUEST_ENTER_SIM_PIN2, responseInts),
+    PROCESSER(RIL_REQUEST_ENTER_SIM_PUK2, responseInts),
+    PROCESSER(RIL_REQUEST_CHANGE_SIM_PIN, responseInts),
+    PROCESSER(RIL_REQUEST_CHANGE_SIM_PIN2, responseInts),
+    PROCESSER(RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION, responseInts),
+    PROCESSER(RIL_REQUEST_GET_CURRENT_CALLS, responseCallList),
+    PROCESSER(RIL_REQUEST_DIAL, responseVoid),
+    PROCESSER(RIL_REQUEST_GET_IMSI, responseString),
+    PROCESSER(RIL_REQUEST_HANGUP, responseVoid),
+    PROCESSER(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND, responseVoid),
+    PROCESSER(RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND, responseVoid),
+    PROCESSER(RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE, responseVoid),
+    PROCESSER(RIL_REQUEST_CONFERENCE, responseVoid),
+    PROCESSER(RIL_REQUEST_UDUB, responseVoid),
+    PROCESSER(RIL_REQUEST_LAST_CALL_FAIL_CAUSE, responseInts),
+    PROCESSER(RIL_REQUEST_SIGNAL_STRENGTH, responseSignalStrength),
+    PROCESSER(RIL_REQUEST_VOICE_REGISTRATION_STATE, responseStrings),
+    PROCESSER(RIL_REQUEST_DATA_REGISTRATION_STATE, responseStrings),
+    PROCESSER(RIL_REQUEST_OPERATOR, responseStrings),
+    PROCESSER(RIL_REQUEST_RADIO_POWER, responseVoid),
+    PROCESSER(RIL_REQUEST_DTMF, responseVoid),
+    PROCESSER(RIL_REQUEST_SEND_SMS, responseSMS),
+    PROCESSER(RIL_REQUEST_SEND_SMS_EXPECT_MORE, responseSMS),
+    PROCESSER(RIL_REQUEST_SETUP_DATA_CALL, responseSetupDataCall),
+    PROCESSER(RIL_REQUEST_SIM_IO, responseICC_IO),
+    PROCESSER(RIL_REQUEST_SEND_USSD, responseVoid),
+    PROCESSER(RIL_REQUEST_CANCEL_USSD, responseVoid),
+    PROCESSER(RIL_REQUEST_GET_CLIR, responseInts),
+    PROCESSER(RIL_REQUEST_SET_CLIR, responseVoid),
+    PROCESSER(RIL_REQUEST_QUERY_CALL_FORWARD_STATUS, responseCallForward),
+    PROCESSER(RIL_REQUEST_SET_CALL_FORWARD, responseVoid),
+    PROCESSER(RIL_REQUEST_QUERY_CALL_WAITING, responseInts),
+    PROCESSER(RIL_REQUEST_SET_CALL_WAITING, responseVoid),
+    PROCESSER(RIL_REQUEST_SMS_ACKNOWLEDGE, responseVoid),
+    PROCESSER(RIL_REQUEST_GET_IMEI, responseString),
+    PROCESSER(RIL_REQUEST_GET_IMEISV, responseString),
+    PROCESSER(RIL_REQUEST_ANSWER, responseVoid),
+    PROCESSER(RIL_REQUEST_DEACTIVATE_DATA_CALL, responseVoid),
+    PROCESSER(RIL_REQUEST_QUERY_FACILITY_LOCK, responseInts),
+    PROCESSER(RIL_REQUEST_SET_FACILITY_LOCK, responseInts),
+    PROCESSER(RIL_REQUEST_CHANGE_BARRING_PASSWORD, responseVoid),
+    PROCESSER(RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE, responseInts),
+    PROCESSER(RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC, responseVoid),
+    PROCESSER(RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL, responseVoid),
+    PROCESSER(RIL_REQUEST_QUERY_AVAILABLE_NETWORKS, responseOperatorInfos),
+    PROCESSER(RIL_REQUEST_DTMF_START, responseVoid),
+    PROCESSER(RIL_REQUEST_DTMF_STOP, responseVoid),
+    PROCESSER(RIL_REQUEST_BASEBAND_VERSION, responseString),
+    PROCESSER(RIL_REQUEST_SEPARATE_CONNECTION, responseVoid),
+    PROCESSER(RIL_REQUEST_SET_MUTE, responseVoid),
+    PROCESSER(RIL_REQUEST_GET_MUTE, responseInts),
+    PROCESSER(RIL_REQUEST_QUERY_CLIP, responseInts),
+    PROCESSER(RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE, responseInts),
+    PROCESSER(RIL_REQUEST_DATA_CALL_LIST, responseDataCallList),
+    PROCESSER(RIL_REQUEST_RESET_RADIO, responseVoid),
+    PROCESSER(RIL_REQUEST_OEM_HOOK_RAW, responseRaw),
+    PROCESSER(RIL_REQUEST_OEM_HOOK_STRINGS, responseStrings),
+    PROCESSER(RIL_REQUEST_SCREEN_STATE, responseVoid),
+    PROCESSER(RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION, responseVoid),
+    PROCESSER(RIL_REQUEST_WRITE_SMS_TO_SIM, responseInts),
+    PROCESSER(RIL_REQUEST_DELETE_SMS_ON_SIM, responseVoid),
+    PROCESSER(RIL_REQUEST_SET_BAND_MODE, responseVoid),
+    PROCESSER(RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE, responseInts),
+    PROCESSER(RIL_REQUEST_STK_GET_PROFILE, responseString),
+    PROCESSER(RIL_REQUEST_STK_SET_PROFILE, responseVoid),
+    PROCESSER(RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND, responseString),
+    PROCESSER(RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE, responseVoid),
+    PROCESSER(RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM, responseInts),
+    PROCESSER(RIL_REQUEST_EXPLICIT_CALL_TRANSFER, responseVoid),
+    PROCESSER(RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE, responseVoid),
+    PROCESSER(RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE, responseGetPreferredNetworkType),
+    PROCESSER(RIL_REQUEST_GET_NEIGHBORING_CELL_IDS, responseCellList),
+    PROCESSER(RIL_REQUEST_SET_LOCATION_UPDATES, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE, responseInts),
+    PROCESSER(RIL_REQUEST_SET_TTY_MODE, responseVoid),
+    PROCESSER(RIL_REQUEST_QUERY_TTY_MODE, responseInts),
+    PROCESSER(RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE, responseInts),
+    PROCESSER(RIL_REQUEST_CDMA_FLASH, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_BURST_DTMF, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_VALIDATE_AND_WRITE_AKEY, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_SEND_SMS, responseSMS),
+    PROCESSER(RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE, responseVoid),
+    PROCESSER(RIL_REQUEST_GSM_GET_BROADCAST_CONFIG, responseGmsBroadcastConfig),
+    PROCESSER(RIL_REQUEST_GSM_SET_BROADCAST_CONFIG, responseVoid),
+    PROCESSER(RIL_REQUEST_GSM_BROADCAST_ACTIVATION, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_GET_BROADCAST_CONFIG, responseCdmaBroadcastConfig),
+    PROCESSER(RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_BROADCAST_ACTIVATION, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_SUBSCRIPTION, responseStrings),
+    PROCESSER(RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM, responseInts),
+    PROCESSER(RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM, responseVoid),
+    PROCESSER(RIL_REQUEST_DEVICE_IDENTITY, responseStrings),
+    PROCESSER(RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE, responseVoid),
+    PROCESSER(RIL_REQUEST_GET_SMSC_ADDRESS, responseString),
+    PROCESSER(RIL_REQUEST_SET_SMSC_ADDRESS, responseVoid),
+    PROCESSER(RIL_REQUEST_REPORT_SMS_MEMORY_STATUS, responseVoid),
+    PROCESSER(RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING, responseVoid),
+    PROCESSER(RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE, responseInts),
+    PROCESSER(RIL_REQUEST_ISIM_AUTHENTICATION, responseString),
+    PROCESSER(RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU, responseVoid),
+    PROCESSER(RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS, responseICC_IO),
+
+    /* request extension from unisoc */
+    PROCESSER(RIL_REQUEST_VOICE_RADIO_TECH, responseInts),
+    PROCESSER(RIL_REQUEST_GET_CELL_INFO_LIST, responseCellInfoList), // TODO
+    PROCESSER(RIL_REQUEST_SET_UNSOL_CELL_INFO_LIST_RATE, responseVoid),
+    PROCESSER(RIL_REQUEST_SET_INITIAL_ATTACH_APN, responseVoid),
+    PROCESSER(RIL_REQUEST_IMS_REGISTRATION_STATE, responseInts),
+    PROCESSER(RIL_REQUEST_IMS_SEND_SMS, responseSMS),
+    PROCESSER(RIL_REQUEST_SIM_TRANSMIT_APDU_BASIC, responseSIM_IO),
+    PROCESSER(RIL_REQUEST_SIM_OPEN_CHANNEL, responseInts),
+    PROCESSER(RIL_REQUEST_SIM_CLOSE_CHANNEL, responseVoid),
+    PROCESSER(RIL_REQUEST_SIM_TRANSMIT_APDU_CHANNEL, responseSIM_IO),
+    PROCESSER(RIL_REQUEST_NV_READ_ITEM, responseString),
+    PROCESSER(RIL_REQUEST_NV_WRITE_ITEM, responseVoid),
+    PROCESSER(RIL_REQUEST_NV_WRITE_CDMA_PRL, responseVoid),
+    PROCESSER(RIL_REQUEST_NV_RESET_CONFIG, responseVoid),
+    PROCESSER(RIL_REQUEST_SET_UICC_SUBSCRIPTION, responseVoid),
+    PROCESSER(RIL_REQUEST_ALLOW_DATA, responseVoid),
+    PROCESSER(RIL_REQUEST_GET_HARDWARE_CONFIG, responseHardwareConfig),
+    PROCESSER(RIL_REQUEST_SIM_AUTHENTICATION, responseSIM_IO),
+    PROCESSER(RIL_REQUEST_GET_DC_RT_INFO, responseDcRtInfo),
+    PROCESSER(RIL_REQUEST_SET_DC_RT_INFO_RATE, responseVoid),
+    PROCESSER(RIL_REQUEST_SET_DATA_PROFILE, responseVoid),
+    PROCESSER(RIL_REQUEST_SHUTDOWN, responseVoid),
+    PROCESSER(RIL_REQUEST_GET_RADIO_CAPABILITY, responseRadioCapability),
+    PROCESSER(RIL_REQUEST_SET_RADIO_CAPABILITY, responseRadioCapability),
+    PROCESSER(RIL_REQUEST_START_LCE, responseLceStatus),
+    PROCESSER(RIL_REQUEST_STOP_LCE, responseLceStatus),
+    PROCESSER(RIL_REQUEST_PULL_LCEDATA, responseLceData),
+    PROCESSER(RIL_REQUEST_GET_ACTIVITY_INFO, responseActivityData),
+};
+
+RILCProcesser *rilcFindSocilitedProcesser(int cmdid)
+{
+    int max_num = sizeof(SocilitedResponseProcesser) / sizeof(RILCProcesser);
+
+    for (int i = 0; i < max_num; i++)
+    {
+        if (SocilitedResponseProcesser[i].commandid == cmdid)
+            return &SocilitedResponseProcesser[i];
+    }
+    return nullptr;
+}
+
+/* unsocilited response handlers */
+static RILCProcesser UnSocilitedResponseProcesser[] = {
+    PROCESSER(RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED, responseVoid),
+    PROCESSER(RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED, responseVoid),
+    PROCESSER(RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED, responseVoid),
+    PROCESSER(RIL_UNSOL_RESPONSE_NEW_SMS, responseString),
+    PROCESSER(RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT, responseString),
+    PROCESSER(RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM, responseInts),
+    PROCESSER(RIL_UNSOL_ON_USSD, responseStrings),
+    PROCESSER(RIL_UNSOL_ON_USSD_REQUEST, responseVoid),
+    PROCESSER(RIL_UNSOL_NITZ_TIME_RECEIVED, responseString),
+    PROCESSER(RIL_UNSOL_SIGNAL_STRENGTH, responseSignalStrength),
+    PROCESSER(RIL_UNSOL_DATA_CALL_LIST_CHANGED, responseDataCallList),
+    PROCESSER(RIL_UNSOL_SUPP_SVC_NOTIFICATION, responseSsn),
+    PROCESSER(RIL_UNSOL_STK_SESSION_END, responseVoid),
+    PROCESSER(RIL_UNSOL_STK_PROACTIVE_COMMAND, responseString),
+    PROCESSER(RIL_UNSOL_STK_EVENT_NOTIFY, responseString),
+    PROCESSER(RIL_UNSOL_STK_CALL_SETUP, responseInts),
+    PROCESSER(RIL_UNSOL_SIM_SMS_STORAGE_FULL, responseVoid),
+    PROCESSER(RIL_UNSOL_SIM_REFRESH, responseInts),
+    PROCESSER(RIL_UNSOL_CALL_RING, responseCallRing),
+    PROCESSER(RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED, responseVoid),
+    PROCESSER(RIL_UNSOL_RESPONSE_CDMA_NEW_SMS, responseCdmaSms),
+    PROCESSER(RIL_UNSOL_RESPONSE_NEW_BROADCAST_SMS, responseRaw),
+    PROCESSER(RIL_UNSOL_CDMA_RUIM_SMS_STORAGE_FULL, responseVoid),
+    PROCESSER(RIL_UNSOL_RESTRICTED_STATE_CHANGED, responseInts),
+    PROCESSER(RIL_UNSOL_ENTER_EMERGENCY_CALLBACK_MODE, responseVoid),
+    PROCESSER(RIL_UNSOL_CDMA_CALL_WAITING, responseCdmaCallWaiting), // TODO
+    PROCESSER(RIL_UNSOL_CDMA_OTA_PROVISION_STATUS, responseInts),
+    PROCESSER(RIL_UNSOL_CDMA_INFO_REC, responseCdmaInformationRecord), // TODO
+    PROCESSER(RIL_UNSOL_OEM_HOOK_RAW, responseRaw),
+    PROCESSER(RIL_UNSOL_RINGBACK_TONE, responseInts),
+    PROCESSER(RIL_UNSOL_RESEND_INCALL_MUTE, responseVoid),
+    PROCESSER(RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED, responseInts),
+    PROCESSER(RIL_UNSOL_CDMA_PRL_CHANGED, responseInts),
+    PROCESSER(RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE, responseVoid),
+    PROCESSER(RIL_UNSOL_RIL_CONNECTED, responseInts),
+    PROCESSER(RIL_UNSOL_VOICE_RADIO_TECH_CHANGED, responseInts),
+    PROCESSER(RIL_UNSOL_CELL_INFO_LIST, responseCellInfoList), // TODO
+    PROCESSER(RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED, responseVoid),
+    PROCESSER(RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED, responseInts),
+    PROCESSER(RIL_UNSOL_SRVCC_STATE_NOTIFY, responseInts),
+    PROCESSER(RIL_UNSOL_HARDWARE_CONFIG_CHANGED, responseHardwareConfig),
+    PROCESSER(RIL_UNSOL_DC_RT_INFO_CHANGED, responseDcRtInfo),
+    PROCESSER(RIL_UNSOL_RADIO_CAPABILITY, responseRadioCapability),
+    PROCESSER(RIL_UNSOL_ON_SS, responseSSData), // TODO
+    PROCESSER(RIL_UNSOL_STK_CC_ALPHA_NOTIFY, responseString),
+    PROCESSER(RIL_UNSOL_LCEDATA_RECV, responseLceData),
+};
+
+RILCProcesser *rilcFindUnSocilitedProcesser(int cmdid)
+{
+    int max_num = sizeof(UnSocilitedResponseProcesser) / sizeof(RILCProcesser);
+    for (int i = 0; i < max_num; i++)
+    {
+        if (UnSocilitedResponseProcesser[i].commandid == cmdid)
+            return &UnSocilitedResponseProcesser[i];
+    }
+    return nullptr;
+}
+
 #define NULLSTR(s) (s == nullptr ? "" : s)
 #define SAFETYFREE(v)        \
     do                       \
@@ -34,16 +251,28 @@ int get_ril_version()
     return ril_version;
 }
 
+/***********************************************************************************/
+/**************************** RILC CONCRETE RESPONSE *******************************/
+/***********************************************************************************/
 void responseStrings(Parcel &p, RILResponse *resp)
 {
     if (!resp)
         return;
 
     int num = p.readInt32();
-    const char **data = (const char **)malloc(num * sizeof(char **));
-    ERROR_MALLOC0(data);
-    for (int i = 0; i < num; i++)
-        data[i] = p.readString();
+    const char **data = nullptr;
+
+    if (num <= 0)
+    {
+        num = 0;
+    }
+    else
+    {
+        data = (const char **)malloc(num * sizeof(char **));
+        ERROR_MALLOC0(data);
+        for (int i = 0; i < num; i++)
+            data[i] = p.readString();
+    }
 
     resp->responseType = TYPE_STRING_ARR;
     resp->responseData.array.data = data;
@@ -59,7 +288,7 @@ void responseStringsShow(RILResponse *resp)
     LOGI << "UNMARSHAL: num of string " << num << ENDL;
     const char **data = (const char **)resp->responseData.array.data;
     for (int i = 0; i < num; i++)
-        LOGI << NULLSTR(data[i]) << " " << ENDL;
+        LOGI << NULLSTR(data[i]) << ENDL;
 }
 
 void responseStringsFree(RILResponse *resp)
@@ -144,167 +373,9 @@ void responseVoidShow(RILResponse *resp)
 
 void responseVoidFree(RILResponse *resp)
 {
+    if (!resp)
+        return;
 }
-
-// private
-// void sendScreenState(boolean on)
-// {
-//     RilRequest *rr = RILREQUEST::obtain(RIL_REQUEST_SCREEN_STATE, null);
-//     rr.mp.writeInt(1);
-//     rr.mp.writeInt(on ? 1 : 0);
-
-//
-//         LOGV << rr->serialString() + "> " << rr->requestToString() << ENDL+ ": " + on);
-
-//     RILREQUEST::send(rr);
-// }
-
-// protected
-// void onRadioAvailable()
-// {
-//     // In case screen state was lost (due to process crash),
-//     // this ensures that the RIL knows the correct screen state.
-
-//     // TODO: Should query Power Manager and send the actual
-//     // screen state.  Just send true for now.
-//     sendScreenState(true);
-// }
-
-// private
-// RadioState getRadioStateFromInt(int stateInt)
-// {
-//     RadioState state;
-
-//     /* RIL_RadioState ril.h */
-//     switch (stateInt)
-//     {
-//     case 0:
-//         state = RadioState.RADIO_OFF;
-//         break;
-//     case 1:
-//         state = RadioState.RADIO_UNAVAILABLE;
-//         break;
-//     case 2:
-//         state = RadioState.SIM_NOT_READY;
-//         break;
-//     case 3:
-//         state = RadioState.SIM_LOCKED_OR_ABSENT;
-//         break;
-//     case 4:
-//         state = RadioState.SIM_READY;
-//         break;
-//     case 5:
-//         state = RadioState.RUIM_NOT_READY;
-//         break;
-//     case 6:
-//         state = RadioState.RUIM_READY;
-//         break;
-//     case 7:
-//         state = RadioState.RUIM_LOCKED_OR_ABSENT;
-//         break;
-//     case 8:
-//         state = RadioState.NV_NOT_READY;
-//         break;
-//     case 9:
-//         state = RadioState.NV_READY;
-//         break;
-
-//     default:
-//         throw new RuntimeException(
-//             "Unrecognized RIL_RadioState: " + stateInt);
-//     }
-//     return state;
-// }
-
-// private
-// void switchToRadioState(RadioState newState)
-// {
-//     setRadioState(newState);
-// }
-
-// private
-// String
-// retToString(int req, Object ret)
-// {
-//     if (ret == null)
-//         return "";
-//     switch (req)
-//     {
-//     // Don't log these return values, for privacy's sake.
-//     case RIL_REQUEST_GET_IMSI:
-//     case RIL_REQUEST_GET_IMEI:
-//     case RIL_REQUEST_GET_IMEISV:
-//         if (!RILJ_LOGV)
-//         {
-//             // If not versbose logging just return and don't display IMSI and IMEI, IMEISV
-//             return "";
-//         }
-//     }
-
-//     StringBuilder sb;
-//     String s;
-//     int length;
-//     if (ret instanceof int[])
-//     {
-//         int[] intArray = (int[])ret;
-//         length = intArray.length;
-//         sb = new StringBuilder("{");
-//         if (length > 0)
-//         {
-//             int i = 0;
-//             sb.append(intArray[i++]);
-//             while (i < length)
-//             {
-//                 sb.append(", ").append(intArray[i++]);
-//             }
-//         }
-//         sb.append("}");
-//         s = sb.toString();
-//     }
-//     else if (ret instanceof String[])
-//     {
-//         String[] strings = (String[])ret;
-//         length = strings.length;
-//         sb = new StringBuilder("{");
-//         if (length > 0)
-//         {
-//             int i = 0;
-//             sb.append(strings[i++]);
-//             while (i < length)
-//             {
-//                 sb.append(", ").append(strings[i++]);
-//             }
-//         }
-//         sb.append("}");
-//         s = sb.toString();
-//     }
-//     else if (req == RIL_REQUEST_GET_CURRENT_CALLS)
-//     {
-//         ArrayList<DriverCall> calls = (ArrayList<DriverCall>)ret;
-//         sb = new StringBuilder(" ");
-//         for (DriverCall dc : calls)
-//         {
-//             sb.append("[").append(dc).append("] ");
-//         }
-//         s = sb.toString();
-//     }
-//     else if (req == RIL_REQUEST_GET_NEIGHBORING_CELL_IDS)
-//     {
-//         ArrayList<NeighboringCellInfo> cells;
-//         cells = (ArrayList<NeighboringCellInfo>)ret;
-//         sb = new StringBuilder(" ");
-//         for (NeighboringCellInfo cell : cells)
-//         {
-//             sb.append(cell).append(" ");
-//         }
-//         s = sb.toString();
-//     }
-//     else
-//     {
-//         s = ret.toString();
-//     }
-//     return s;
-// }
 
 void responseCallForward(Parcel &p, RILResponse *resp)
 {
@@ -331,6 +402,7 @@ void responseCallForwardShow(RILResponse *resp)
         return;
 
     RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)resp->responseData.array.data;
+    LOGI << "UNMARSHALL:" << ENDL;
     LOGI << "  notificationType = " << response->notificationType << ENDL;
     LOGI << "  code  = " << response->code << ENDL;
     LOGI << "  index = " << response->index << ENDL;
@@ -348,7 +420,7 @@ void responseCallForwardFree(RILResponse *resp)
     SAFETYFREE(resp->responseData.array.data);
 }
 
-void responseSuppServiceNotification(Parcel &p, RILResponse *resp)
+void responseCdmaSms(Parcel &p, RILResponse *resp)
 {
     int digitCount;
     int digitLimit;
@@ -368,22 +440,19 @@ void responseSuppServiceNotification(Parcel &p, RILResponse *resp)
     response->sAddress.number_of_digits = p.readInt32();
     digitLimit = response->sAddress.number_of_digits < RIL_CDMA_SMS_ADDRESS_MAX ? response->sAddress.number_of_digits : RIL_CDMA_SMS_ADDRESS_MAX;
     for (digitCount = 0; digitCount < digitLimit; digitCount++)
-    {
         response->sAddress.digits[digitCount] = p.readInt32();
-    }
 
     response->sSubAddress.subaddressType = static_cast<RIL_CDMA_SMS_SubaddressType>(p.readInt32());
     response->sSubAddress.odd = p.readInt32();
     response->sSubAddress.number_of_digits = p.readInt32();
     digitLimit = response->sSubAddress.number_of_digits < RIL_CDMA_SMS_SUBADDRESS_MAX ? response->sSubAddress.number_of_digits : RIL_CDMA_SMS_SUBADDRESS_MAX;
     for (digitCount = 0; digitCount < digitLimit; digitCount++)
-    {
         response->sSubAddress.digits[digitCount] = p.readInt32();
-    }
-    //     SmsMessage sms;
+
+    // SmsMessage sms;
     digitLimit = response->uBearerDataLen < RIL_CDMA_SMS_BEARER_DATA_MAX ? response->uBearerDataLen : RIL_CDMA_SMS_BEARER_DATA_MAX;
     response->uBearerDataLen = p.readInt32();
-    //     sms = SmsMessage.newFromParcel(p);
+    // sms = SmsMessage.newFromParcel(p);
     for (digitCount = 0; digitCount < digitLimit; digitCount++)
     {
         response->aBearerData[digitCount] = p.readInt32();
@@ -394,7 +463,7 @@ void responseSuppServiceNotification(Parcel &p, RILResponse *resp)
     resp->responseData.array.data = response;
 }
 
-void responseSuppServiceNotificationShow(RILResponse *resp)
+void responseCdmaSmsShow(RILResponse *resp)
 {
     if (!resp)
         return;
@@ -422,7 +491,7 @@ void responseSuppServiceNotificationShow(RILResponse *resp)
         LOGI << "    digits[" << digitCount << "]" << response->sSubAddress.digits[digitCount] << ENDL;
 }
 
-void responseSuppServiceNotificationFree(RILResponse *resp)
+void responseCdmaSmsFree(RILResponse *resp)
 {
     if (!resp)
         return;
@@ -432,48 +501,44 @@ void responseSuppServiceNotificationFree(RILResponse *resp)
 
 void responseRaw(Parcel &p, RILResponse *resp)
 {
-    // int response_len = p.readInt32();
-    // if (!resp)
-    //     return;
+    if (!resp)
+        return;
 
-    // uint8_t* response = ;
+    uint8_t *response = nullptr;
+    int response_len = p.readInt32();
+    if (response_len == -1)
+    {
+        response_len = 0;
+    }
+    else
+    {
+        response = (uint8_t *)malloc(response_len);
+        ERROR_MALLOC0(response);
+        memcpy(response, p.readInplace(response_len), response_len);
+    }
 
-    // if (!response || !resp)
-    //     return;
-
-    // (void)response_len;
-    // resp->responseType = TYPE_INT;
-    // resp->responseData.value_int = response;
+    resp->responseType = TYPE_RAWDATA;
+    resp->responseData.array.num = response_len;
+    resp->responseData.array.data = response;
 }
 
 void responseRawShow(RILResponse *resp)
 {
-    // int response;
-    // int response_len;
-    // response_len = p.readInt32();
-    // response = p.readInt32();
+    if (!resp)
+        return;
 
-    // if (!response || !resp)
-    //     return;
-
-    // (void)response_len;
-    // resp->responseType = TYPE_INT;
-    // resp->responseData.value_int = response;
+    LOGI << "UNMARSHALL: rawdara" << ENDL;
+    uint8_t *data = (uint8_t *)resp->responseData.array.data;
+    for (int i = 0; i < resp->responseData.array.num; i++)
+        LOGI << "  [" << i << "] = " << data[i] << ENDL;
 }
 
 void responseRawFree(RILResponse *resp)
 {
-    // int response;
-    // int response_len;
-    // response_len = p.readInt32();
-    // response = p.readInt32();
+    if (!resp)
+        return;
 
-    // if (!response || !resp)
-    //     return;
-
-    // (void)response_len;
-    // resp->responseType = TYPE_INT;
-    // resp->responseData.value_int = response;
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseSMS(Parcel &p, RILResponse *resp)
@@ -498,6 +563,7 @@ void responseSMSShow(RILResponse *resp)
         return;
 
     RIL_SMS_Response *response = (RIL_SMS_Response *)resp->responseData.array.data;
+    LOGI << "UNMARSHALL:" << ENDL;
     LOGI << "  messageRef = " << response->messageRef << ENDL;
     LOGI << "  ackPDU = " << response->ackPDU << ENDL;
     LOGI << "  errorCode = " << response->errorCode << ENDL;
@@ -535,7 +601,7 @@ void responseICC_IOShow(RILResponse *resp)
     RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)resp->responseData.array.data;
     LOGI << "  sw1 = " << response->sw1 << ENDL;
     LOGI << "  sw2 = " << response->sw2 << ENDL;
-    LOGI << "  simResponse = " << response->simResponse << ENDL;
+    LOGI << "  simResponse = " << NULLSTR(response->simResponse) << ENDL;
 }
 
 void responseICC_IOFree(RILResponse *resp)
@@ -719,56 +785,6 @@ void responseCallListFree(RILResponse *resp)
     SAFETYFREE(resp->responseData.array.data);
 }
 
-//     int num;
-//     int voiceSettings;
-//     ArrayList<DriverCall> response;
-//     DriverCall dc;
-
-//     num = p.readInt32();
-//     response = new ArrayList<DriverCall>(num);
-
-//     for (int i = 0; i < num; i++)
-//     {
-//         dc = new DriverCall();
-
-//         dc.state = DriverCall.stateFromCLCC(p.readInt32());
-//         dc.index = p.readInt32();
-//         dc.TOA = p.readInt32();
-//         dc.isMpty = (0 != p.readInt32());
-//         dc.isMT = (0 != p.readInt32());
-//         dc.als = p.readInt32();
-//         voiceSettings = p.readInt32();
-//         dc.isVoice = (0 == voiceSettings) ? false : true;
-//         dc.isVoicePrivacy = (0 != p.readInt32());
-//         dc.number = p.readString();
-//         int np = p.readInt32();
-//         dc.numberPresentation = DriverCall.presentationFromCLIP(np);
-//         dc.name = p.readString();
-//         dc.namePresentation = p.readInt32();
-//         int uusInfoPresent = p.readInt32();
-//         if (uusInfoPresent == 1)
-//         {
-//             dc.uusInfo = new UUSInfo();
-//             dc.uusInfo.setType(p.readInt32());
-//             dc.uusInfo.setDcs(p.readInt32());
-//             byte[] userData = p.createByteArray();
-//             dc.uusInfo.setUserData(userData);
-//             riljLogv(String.format("Incoming UUS : type=%d, dcs=%d, length=%d",
-//                                    dc.uusInfo.getType(), dc.uusInfo.getDcs(),
-//                                    dc.uusInfo.getUserData().length));
-//             riljLogv("Incoming UUS : data (string)=" + new String(dc.uusInfo.getUserData()));
-//             riljLogv("Incoming UUS : data (hex): " + IccUtils.bytesToHexString(dc.uusInfo.getUserData()));
-//         }
-//         else
-//         {
-//             riljLogv("Incoming UUS : NOT present!");
-//         }
-
-//         // Make sure there's a leading + on addresses with a TOA of 145
-//         dc.number = PhoneNumberUtils.stringFromStringAndTOA(dc.number, dc.TOA);
-
-//         response.add(dc);
-
 void responseDataCallList(Parcel &p, RILResponse *resp)
 {
     int dontCare = p.readInt32();
@@ -842,46 +858,33 @@ void responseDataCallListFree(RILResponse *resp)
 
 void responseSetupDataCall(Parcel &p, RILResponse *resp)
 {
-    return responseDataCallList(p, resp);
+    responseDataCallList(p, resp);
 }
 
 void responseSetupDataCallShow(RILResponse *resp)
 {
-    return responseDataCallListShow(resp);
+    responseDataCallListShow(resp);
 }
 
 void responseSetupDataCallFree(RILResponse *resp)
 {
-    return responseDataCallListFree(resp);
+    responseDataCallListFree(resp);
 }
 
 void responseOperatorInfos(Parcel &p, RILResponse *resp)
 {
-    //     String strings[] = (String[])responseStrings(p);
-    //     ArrayList<OperatorInfo> ret;
-
-    //     if (strings.length % 4 != 0)
-    //     {
-    //         throw new RuntimeException(
-    //             "RIL_REQUEST_QUERY_AVAILABLE_NETWORKS: invalid response. Got " + strings.length + " strings, expected multible of 4");
-    //     }
-
-    //     ret = new ArrayList<OperatorInfo>(strings.length / 4);
-
-    //     for (int i = 0; i < strings.length; i += 4)
-    //     {
-    //         ret.add(
-    //             new OperatorInfo(
-    //                 strings[i + 0],
-    //                 strings[i + 1],
-    //                 strings[i + 2],
-    //                 strings[i + 3]));
-    //     }
+    responseStrings(p, resp);
 }
 
-void responseOperatorInfosShow(RILResponse *resp) {}
+void responseOperatorInfosShow(RILResponse *resp)
+{
+    responseStringShow(resp);
+}
 
-void responseOperatorInfosFree(RILResponse *resp) {}
+void responseOperatorInfosFree(RILResponse *resp)
+{
+    responseStringFree(resp);
+}
 
 void responseCellList(Parcel &p, RILResponse *resp)
 {
@@ -947,67 +950,94 @@ void responseGetPreferredNetworkTypeFree(RILResponse *resp)
 
 void responseGmsBroadcastConfig(Parcel &p, RILResponse *resp)
 {
-    //     int num;
-    //     ArrayList<SmsBroadcastConfigInfo> response;
-    //     SmsBroadcastConfigInfo info;
+    if (!resp)
+        return;
 
-    //     num = p.readInt32();
-    //     response = new ArrayList<SmsBroadcastConfigInfo>(num);
+    int num = p.readInt32();
+    RIL_GSM_BroadcastSmsConfigInfo *response = (RIL_GSM_BroadcastSmsConfigInfo *)malloc(num * sizeof(RIL_GSM_BroadcastSmsConfigInfo));
+    ERROR_MALLOC0(response);
 
-    //     for (int i = 0; i < num; i++)
-    //     {
-    //         int fromId = p.readInt32();
-    //         int toId = p.readInt32();
-    //         int fromScheme = p.readInt32();
-    //         int toScheme = p.readInt32();
-    //         boolean selected = (p.readInt32() == 1);
+    for (int i = 0; i < num; i++)
+    {
+        response[i].fromServiceId = p.readInt32();
+        response[i].toServiceId = p.readInt32();
+        response[i].fromCodeScheme = p.readInt32();
+        response[i].toCodeScheme = p.readInt32();
+        response[i].selected = p.readInt32();
+    }
 
-    //         info = new SmsBroadcastConfigInfo(fromId, toId, fromScheme,
-    //                                           toScheme, selected);
-    //         response.add(info);
-    //     }
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = num;
+    resp->responseData.array.data = response;
+}
+
+void responseGmsBroadcastConfigShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    int num = resp->responseData.array.num;
+    RIL_GSM_BroadcastSmsConfigInfo *response = (RIL_GSM_BroadcastSmsConfigInfo *)resp->responseData.array.data;
+    for (int i = 0; i < num; i++)
+    {
+        LOGI << "  [" << i << "].fromServiceId = " << response[i].fromServiceId << ENDL;
+        LOGI << "  [" << i << "].toServiceId = " << response[i].toServiceId << ENDL;
+        LOGI << "  [" << i << "].fromCodeScheme = " << response[i].fromCodeScheme << ENDL;
+        LOGI << "  [" << i << "].toCodeScheme = " << response[i].toCodeScheme << ENDL;
+        LOGI << "  [" << i << "].selected = " << response[i].selected << ENDL;
+    }
+}
+
+void responseGmsBroadcastConfigFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseCdmaBroadcastConfig(Parcel &p, RILResponse *resp)
 {
-    //     int numServiceCategories;
-    //     int response[];
+    if (!resp)
+        return;
 
-    //     numServiceCategories = p.readInt32();
+    int num = p.readInt32();
+    RIL_CDMA_BroadcastSmsConfigInfo *response = (RIL_CDMA_BroadcastSmsConfigInfo *)malloc(num * sizeof(RIL_CDMA_BroadcastSmsConfigInfo));
+    ERROR_MALLOC0(response);
 
-    //     if (numServiceCategories == 0)
-    //     {
-    //         // TODO: The logic of providing default values should
-    //         // not be done by this transport layer. And needs to
-    //         // be done by the vendor ril or application logic.
-    //         int numInts;
-    //         numInts = CDMA_BROADCAST_SMS_NO_OF_SERVICE_CATEGORIES * CDMA_BSI_NO_OF_INTS_STRUCT + 1;
-    //         response = new int[numInts];
+    for (int i = 0; i < num; i++)
+    {
+        response[i].service_category = p.readInt32();
+        response[i].language = p.readInt32();
+        response[i].selected = p.readInt32();
+    }
 
-    //         // Faking a default record for all possible records.
-    //         response[0] = CDMA_BROADCAST_SMS_NO_OF_SERVICE_CATEGORIES;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = num;
+    resp->responseData.array.data = response;
+}
 
-    //         // Loop over CDMA_BROADCAST_SMS_NO_OF_SERVICE_CATEGORIES set 'english' as
-    //         // default language and selection status to false for all.
-    //         for (int i = 1; i < numInts; i += CDMA_BSI_NO_OF_INTS_STRUCT)
-    //         {
-    //             response[i + 0] = i / CDMA_BSI_NO_OF_INTS_STRUCT;
-    //             response[i + 1] = 1;
-    //             response[i + 2] = 0;
-    //         }
-    //     }
-    //     else
-    //     {
-    //         int numInts;
-    //         numInts = (numServiceCategories * CDMA_BSI_NO_OF_INTS_STRUCT) + 1;
-    //         response = new int[numInts];
+void responseCdmaBroadcastConfigShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
 
-    //         response[0] = numServiceCategories;
-    //         for (int i = 1; i < numInts; i++)
-    //         {
-    //             response[i] = p.readInt32();
-    //         }
-    //     }
+    int num = resp->responseData.array.num;
+    RIL_CDMA_BroadcastSmsConfigInfo *response = (RIL_CDMA_BroadcastSmsConfigInfo *)resp->responseData.array.data;
+
+    for (int i = 0; i < num; i++)
+    {
+        LOGI << "  [" << i << "].service_category = " << response[i].service_category << ENDL;
+        LOGI << "  [" << i << "].language = " << response[i].language << ENDL;
+        LOGI << "  [" << i << "].selected = " << response[i].selected << ENDL;
+    }
+}
+
+void responseCdmaBroadcastConfigFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 void responseSignalStrength(Parcel &p, RILResponse *resp)
@@ -1068,137 +1098,460 @@ void responseSignalStrengthFree(RILResponse *resp)
 
 void responseCdmaInformationRecord(Parcel &p, RILResponse *resp)
 {
-    //     int numberOfInfoRecs;
-    //     ArrayList<CdmaInformationRecords> response;
-
-    //     /**
-    //          * Loop through all of the information records unmarshalling them
-    //          * and converting them to Java Objects.
-    //          */
-    //     numberOfInfoRecs = p.readInt32();
-    //     response = new ArrayList<CdmaInformationRecords>(numberOfInfoRecs);
-
-    //     for (int i = 0; i < numberOfInfoRecs; i++)
-    //     {
-    //         CdmaInformationRecords InfoRec = new CdmaInformationRecords(p);
-    //         response.add(InfoRec);
-    //     }
+    if (!resp)
+        return;
 }
-void responseCdmaInformationRecordShow(RILResponse *resp) {}
-void responseCdmaInformationRecordFree(RILResponse *resp) {}
+
+void responseCdmaInformationRecordShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
+
+void responseCdmaInformationRecordFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
 
 void responseCdmaCallWaiting(Parcel &p, RILResponse *resp)
 {
-    //     CdmaCallWaitingNotification notification = new CdmaCallWaitingNotification();
+    if (!resp)
+        return;
+    // RIL_CDMA_CallWaiting_v6 *response = (RIL_CDMA_CallWaiting_v6 *)malloc(sizeof(RIL_CDMA_CallWaiting_v6));
 
-    //     notification.number = p.readString();
-    //     notification.numberPresentation = notification.presentationFromCLIP(p.readInt32());
-    //     notification.name = p.readString();
-    //     notification.namePresentation = notification.numberPresentation;
-    //     notification.isPresent = p.readInt32();
-    //     notification.signalType = p.readInt32();
-    //     notification.alertPitch = p.readInt32();
-    //     notification.signal = p.readInt32();
-    //     notification.numberType = p.readInt32();
-    //     notification.numberPlan = p.readInt32();
+    // response->number = p.readString();
+    // response->numberPresentation = p.readInt32();
+    // response->name = p.readString();
+    // marshallSignalInfoRecord(p, response->signalInfoRecord);
+
+    // if (s_callbacks.version <= LAST_IMPRECISE_RIL_VERSION)
+    // {
+    //     if (responselen >= sizeof(RIL_CDMA_CallWaiting_v6))
+    //     {
+    //         p.readInt32(response->number_type);
+    //         p.readInt32(response->number_plan);
+    //     }
+    //     else
+    //     {
+    //         p.readInt32(0);
+    //         p.readInt32(0);
+    //     }
+    // }
+    // else
+    // { // RIL version >= 13
+    //     p.readInt32(response->number_type);
+    //     p.readInt32(response->number_plan);
+    // }
 }
-void responseCdmaCallWaitingShow(RILResponse *resp) {}
-void responseCdmaCallWaitingFree(RILResponse *resp) {}
+
+void responseCdmaCallWaitingShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
+
+void responseCdmaCallWaitingFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
 
 void responseCallRing(Parcel &p, RILResponse *resp)
 {
-    //     char response[] = new char[4];
+    if (!resp)
+        return;
+    RIL_CDMA_SignalInfoRecord *response = (RIL_CDMA_SignalInfoRecord *)malloc(sizeof(RIL_CDMA_SignalInfoRecord));
+    ERROR_MALLOC0(response);
 
-    //     response[0] = (char)p.readInt32(); // isPresent
-    //     response[1] = (char)p.readInt32(); // signalType
-    //     response[2] = (char)p.readInt32(); // alertPitch
-    //     response[3] = (char)p.readInt32(); // signal
+    response->isPresent = p.readInt32();
+    response->signalType = p.readInt32();
+    response->alertPitch = p.readInt32();
+    response->signal = p.readInt32();
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
 }
 
-void responseCallRingShow(RILResponse *resp) {}
-void responseCallRingFree(RILResponse *resp) {}
-
-void responseCdmaSms(Parcel &, RILResponse *)
+void responseCallRingShow(RILResponse *resp)
 {
-}
-void responseCdmaSmsShow(RILResponse *) {}
-void responseCdmaSmsFree(RILResponse *) {}
+    if (!resp)
+        return;
+    RIL_CDMA_SignalInfoRecord *response = (RIL_CDMA_SignalInfoRecord *)resp->responseData.array.data;
 
-// private
-// void notifyRegistrantsCdmaInfoRec(CdmaInformationRecords infoRec)
-// {
-//     int response = RIL_UNSOL_CDMA_INFO_REC;
-//     if (infoRec.record instanceof CdmaInformationRecords.CdmaDisplayInfoRec)
-//     {
-//         if (mDisplayInfoRegistrants != null)
-//         {
-//
-//                 unsljLogRet(response, infoRec.record);
-//             mDisplayInfoRegistrants.notifyRegistrants(
-//                 new AsyncResult(null, infoRec.record, null));
-//         }
-//     }
-//     else if (infoRec.record instanceof CdmaInformationRecords.CdmaSignalInfoRec)
-//     {
-//         if (mSignalInfoRegistrants != null)
-//         {
-//
-//                 unsljLogRet(response, infoRec.record);
-//             mSignalInfoRegistrants.notifyRegistrants(
-//                 new AsyncResult(null, infoRec.record, null));
-//         }
-//     }
-//     else if (infoRec.record instanceof CdmaInformationRecords.CdmaNumberInfoRec)
-//     {
-//         if (mNumberInfoRegistrants != null)
-//         {
-//
-//                 unsljLogRet(response, infoRec.record);
-//             mNumberInfoRegistrants.notifyRegistrants(
-//                 new AsyncResult(null, infoRec.record, null));
-//         }
-//     }
-//     else if (infoRec.record instanceof CdmaInformationRecords.CdmaRedirectingNumberInfoRec)
-//     {
-//         if (mRedirNumInfoRegistrants != null)
-//         {
-//
-//                 unsljLogRet(response, infoRec.record);
-//             mRedirNumInfoRegistrants.notifyRegistrants(
-//                 new AsyncResult(null, infoRec.record, null));
-//         }
-//     }
-//     else if (infoRec.record instanceof CdmaInformationRecords.CdmaLineControlInfoRec)
-//     {
-//         if (mLineControlInfoRegistrants != null)
-//         {
-//
-//                 unsljLogRet(response, infoRec.record);
-//             mLineControlInfoRegistrants.notifyRegistrants(
-//                 new AsyncResult(null, infoRec.record, null));
-//         }
-//     }
-//     else if (infoRec.record instanceof CdmaInformationRecords.CdmaT53ClirInfoRec)
-//     {
-//         if (mT53ClirInfoRegistrants != null)
-//         {
-//
-//                 unsljLogRet(response, infoRec.record);
-//             mT53ClirInfoRegistrants.notifyRegistrants(
-//                 new AsyncResult(null, infoRec.record, null));
-//         }
-//     }
-//     else if (infoRec.record instanceof CdmaInformationRecords.CdmaT53AudioControlInfoRec)
-//     {
-//         if (mT53AudCntrlInfoRegistrants != null)
-//         {
-//
-//                 unsljLogRet(response, infoRec.record);
-//             mT53AudCntrlInfoRegistrants.notifyRegistrants(
-//                 new AsyncResult(null, infoRec.record, null));
-//         }
-//     }
-// }
+    LOGI << "  isPresent = " << response->isPresent << ENDL;
+    LOGI << "  signalType = " << response->signalType << ENDL;
+    LOGI << "  alertPitch = " << response->alertPitch << ENDL;
+    LOGI << "  signal = " << response->signal << ENDL;
+}
+
+void responseCallRingFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
+}
+
+void responseCellInfoList(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
+
+void responseCellInfoListShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
+
+void responseCellInfoListFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
+
+void responseSIM_IO(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)malloc(sizeof(RIL_SIM_IO_Response));
+    ERROR_MALLOC0(response);
+
+    response->sw1 = p.readInt32();
+    response->sw2 = p.readInt32();
+    response->simResponse = p.readString();
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseSIM_IOShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_SIM_IO_Response *response = (RIL_SIM_IO_Response *)resp->responseData.array.data;
+    LOGI << "UNMARSHALL" << ENDL;
+    LOGI << "  sw1 = " << response->sw1 << ENDL;
+    LOGI << "  sw2 = " << response->sw2 << ENDL;
+    LOGI << "  simResponse = " << NULLSTR(response->simResponse) << ENDL;
+}
+
+void responseSIM_IOFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
+}
+
+void responseHardwareConfig(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+    int num = p.readInt32();
+    RIL_HardwareConfig *response = (RIL_HardwareConfig *)malloc(num * sizeof(RIL_HardwareConfig));
+    ERROR_MALLOC0(response);
+
+    for (int i = 0; i < num; i++)
+    {
+        switch (response[i].type)
+        {
+        case RIL_HARDWARE_CONFIG_MODEM:
+        {
+            const char *str = p.readString();
+            snprintf(response[i].uuid, 64, "%s", NULLSTR(str));
+            p.freeString(str);
+            response[i].state = static_cast<RIL_HardwareConfig_State>(p.readInt32());
+            response[i].cfg.modem.rat = p.readInt32();
+            response[i].cfg.modem.maxVoice = p.readInt32();
+            response[i].cfg.modem.maxData = p.readInt32();
+            response[i].cfg.modem.maxStandby = p.readInt32();
+            break;
+        }
+        case RIL_HARDWARE_CONFIG_SIM:
+        {
+            const char *str = p.readString();
+            snprintf(response[i].uuid, 64, "%s", NULLSTR(str));
+            p.freeString(str);
+            response[i].state = static_cast<RIL_HardwareConfig_State>(p.readInt32());
+            str = p.readString();
+            snprintf(response[i].cfg.sim.modemUuid, 64, "%s", NULLSTR(str));
+            p.freeString(str);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = num;
+    resp->responseData.array.data = response;
+}
+
+void responseHardwareConfigShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    int num = resp->responseData.array.num;
+    RIL_HardwareConfig *response = (RIL_HardwareConfig *)resp->responseData.array.data;
+    for (int i = 0; i < num; i++)
+    {
+        switch (response[i].type)
+        {
+        case RIL_HARDWARE_CONFIG_MODEM:
+        {
+            LOGI << "  [" << i << "].type = RIL_HARDWARE_CONFIG_MODEM" << ENDL;
+            LOGI << "  [" << i << "].uuid = " << response[i].uuid << ENDL;
+            LOGI << "  [" << i << "].state = " << response[i].state << ENDL;
+            LOGI << "  [" << i << "].cfg.modem.rat = " << response[i].cfg.modem.rat << ENDL;
+            LOGI << "  [" << i << "].cfg.modem.maxVoice = " << response[i].cfg.modem.maxVoice << ENDL;
+            LOGI << "  [" << i << "].cfg.modem.maxData = " << response[i].cfg.modem.maxData << ENDL;
+            LOGI << "  [" << i << "].cfg.modem.maxStandby = " << response[i].cfg.modem.maxStandby << ENDL;
+            break;
+        }
+        case RIL_HARDWARE_CONFIG_SIM:
+        {
+            LOGI << "  [" << i << "].type = RIL_HARDWARE_CONFIG_SIM" << ENDL;
+            LOGI << "  [" << i << "].uuid = " << response[i].uuid << ENDL;
+            LOGI << "  [" << i << "].state = " << response[i].state << ENDL;
+            LOGI << "  [" << i << "].cfg.sim.modemUuid = " << response[i].cfg.sim.modemUuid << ENDL;
+            break;
+        }
+        default:
+            break;
+        }
+    }
+}
+
+void responseHardwareConfigFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
+}
+
+void responseDcRtInfo(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_DcRtInfo *response = (RIL_DcRtInfo *)malloc(sizeof(RIL_DcRtInfo));
+    response->time = p.readInt64();
+    response->powerState = static_cast<RIL_DcPowerStates>(p.readInt32());
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseDcRtInfoShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_DcRtInfo *response = (RIL_DcRtInfo *)resp->responseData.array.data;
+    LOGI << "  time = " << response->time << ENDL;
+    LOGI << "  powerState = " << response->powerState << ENDL;
+}
+
+void responseDcRtInfoFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
+}
+
+void responseRadioCapability(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_RadioCapability *response = (RIL_RadioCapability *)malloc(sizeof(RIL_RadioCapability));
+    response->version = p.readInt32();
+    response->session = p.readInt32();
+    response->phase = p.readInt32();
+    response->rat = p.readInt32();
+    const char *str = p.readString();
+    snprintf(response->logicalModemUuid, 64, "%s", NULLSTR(str));
+    p.freeString(str);
+    response->status = p.readInt32();
+}
+
+void responseRadioCapabilityShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_RadioCapability *response = (RIL_RadioCapability *)resp->responseData.array.data;
+    LOGI << "  version = " << response->version << ENDL;
+    LOGI << "  session = " << response->session << ENDL;
+    LOGI << "  phase = " << response->phase << ENDL;
+    LOGI << "  rat = " << response->rat << ENDL;
+    LOGI << "  logicalModemUuid = " << response->logicalModemUuid << ENDL;
+    LOGI << "  status = " << response->status << ENDL;
+}
+
+void responseRadioCapabilityFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
+}
+
+void responseLceStatus(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_LceStatusInfo *response = (RIL_LceStatusInfo *)malloc(sizeof(RIL_LceStatusInfo));
+    p.read((void *)response, 1); // response->lce_status takes one byte.
+    response->actual_interval_ms = p.readInt32();
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseLceStatusShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_LceStatusInfo *response = (RIL_LceStatusInfo *)resp->responseData.array.data;
+    LOGI << "  lce_status = " << response->lce_status << ENDL;
+    LOGI << "  actual_interval_ms = " << response->actual_interval_ms << ENDL;
+}
+
+void responseLceStatusFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
+}
+
+void responseLceData(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_LceDataInfo *response = (RIL_LceDataInfo *)malloc(sizeof(RIL_LceDataInfo));
+    ERROR_MALLOC0(response);
+
+    response->last_hop_capacity_kbps = p.readInt32();
+    p.read((void *)&(response->confidence_level), 1);
+    p.read((void *)&(response->lce_suspended), 1);
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseLceDataShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_LceDataInfo *response = (RIL_LceDataInfo *)resp->responseData.array.data;
+    LOGI << "  last_hop_capacity_kbps = " << response->last_hop_capacity_kbps << ENDL;
+    LOGI << "  confidence_level = " << response->confidence_level << ENDL;
+    LOGI << "  lce_suspended = " << response->lce_suspended << ENDL;
+}
+
+void responseLceDataFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
+}
+
+void responseActivityData(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+
+    RIL_ActivityStatsInfo *response = (RIL_ActivityStatsInfo *)response;
+    response->sleep_mode_time_ms = p.readInt32();
+    response->idle_mode_time_ms = p.readInt32();
+    for (int i = 0; i < RIL_NUM_TX_POWER_LEVELS; i++)
+        response->tx_mode_time_ms[i] = p.readInt32();
+    response->rx_mode_time_ms = p.readInt32();
+}
+
+void responseActivityDataShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_ActivityStatsInfo *response = (RIL_ActivityStatsInfo *)resp->responseData.array.data;
+    LOGI << "  sleep_mode_time_ms = " << response->sleep_mode_time_ms << ENDL;
+    LOGI << "  idle_mode_time_ms = " << response->idle_mode_time_ms << ENDL;
+    for (int i = 0; i < RIL_NUM_TX_POWER_LEVELS; i++)
+        LOGI << "  [" << i << "].idle_mode_time_ms = " << response->tx_mode_time_ms[i] << ENDL;
+    LOGI << "  rx_mode_time_ms = " << response->rx_mode_time_ms << ENDL;
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseActivityDataFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    SAFETYFREE(resp->responseData.array.data);
+}
+
+void responseSSData(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
+
+void responseSSDataShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
+
+void responseSSDataFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+}
+
+void responseSsn(Parcel &p, RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)malloc(sizeof(RIL_SuppSvcNotification));
+    response->notificationType = p.readInt32();
+    response->code = p.readInt32();
+    response->index = p.readInt32();
+    response->type = p.readInt32();
+    response->number = p.readString();
+
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
+}
+
+void responseSsnShow(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)resp->responseData.array.data;
+    LOGI << "  notificationType = " << response->notificationType << ENDL;
+    LOGI << "  code = " << response->code << ENDL;
+    LOGI << "  index = " << response->index << ENDL;
+    LOGI << "  type = " << response->type << ENDL;
+    LOGI << "  number = " << NULLSTR(response->number) << ENDL;
+}
+
+void responseSsnFree(RILResponse *resp)
+{
+    if (!resp)
+        return;
+    RIL_SuppSvcNotification *response = (RIL_SuppSvcNotification *)resp->responseData.array.data;
+    SAFETYFREE(response->number);
+    SAFETYFREE(resp->responseData.array.data);
+}
 
 std::string responseToString(int respid)
 {
@@ -1219,13 +1572,11 @@ std::string responseToString(int respid)
     case RIL_UNSOL_ON_USSD:
         return "UNSOL_ON_USSD";
     case RIL_UNSOL_ON_USSD_REQUEST:
-        return "UNSOL_ON_USSD_REQUEST";
+        return "UNSOL_ON_USSD_REQUEST(obsolete)";
     case RIL_UNSOL_NITZ_TIME_RECEIVED:
         return "UNSOL_NITZ_TIME_RECEIVED";
     case RIL_UNSOL_SIGNAL_STRENGTH:
         return "UNSOL_SIGNAL_STRENGTH";
-    case RIL_UNSOL_DATA_CALL_LIST_CHANGED:
-        return "UNSOL_DATA_CALL_LIST_CHANGED";
     case RIL_UNSOL_SUPP_SVC_NOTIFICATION:
         return "UNSOL_SUPP_SVC_NOTIFICATION";
     case RIL_UNSOL_STK_SESSION_END:
@@ -1237,17 +1588,19 @@ std::string responseToString(int respid)
     case RIL_UNSOL_STK_CALL_SETUP:
         return "UNSOL_STK_CALL_SETUP";
     case RIL_UNSOL_SIM_SMS_STORAGE_FULL:
-        return "UNSOL_SIM_SMS_STORAGE_FULL";
+        return "UNSOL_SIM_SMS_STORAGE_FUL";
     case RIL_UNSOL_SIM_REFRESH:
         return "UNSOL_SIM_REFRESH";
+    case RIL_UNSOL_DATA_CALL_LIST_CHANGED:
+        return "UNSOL_DATA_CALL_LIST_CHANGED";
     case RIL_UNSOL_CALL_RING:
         return "UNSOL_CALL_RING";
     case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:
         return "UNSOL_RESPONSE_SIM_STATUS_CHANGED";
     case RIL_UNSOL_RESPONSE_CDMA_NEW_SMS:
-        return "UNSOL_RESPONSE_CDMA_NEW_SMS";
+        return "UNSOL_NEW_CDMA_SMS";
     case RIL_UNSOL_RESPONSE_NEW_BROADCAST_SMS:
-        return "UNSOL_RESPONSE_NEW_BROADCAST_SMS";
+        return "UNSOL_NEW_BROADCAST_SMS";
     case RIL_UNSOL_CDMA_RUIM_SMS_STORAGE_FULL:
         return "UNSOL_CDMA_RUIM_SMS_STORAGE_FULL";
     case RIL_UNSOL_RESTRICTED_STATE_CHANGED:
@@ -1263,11 +1616,11 @@ std::string responseToString(int respid)
     case RIL_UNSOL_OEM_HOOK_RAW:
         return "UNSOL_OEM_HOOK_RAW";
     case RIL_UNSOL_RINGBACK_TONE:
-        return "UNSOL_RINGBACK_TONG";
+        return "UNSOL_RINGBACK_TONE";
     case RIL_UNSOL_RESEND_INCALL_MUTE:
         return "UNSOL_RESEND_INCALL_MUTE";
     case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
-        return "CDMA_SUBSCRIPTION_SOURCE_CHANGED";
+        return "UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED";
     case RIL_UNSOL_CDMA_PRL_CHANGED:
         return "UNSOL_CDMA_PRL_CHANGED";
     case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE:
@@ -1275,114 +1628,103 @@ std::string responseToString(int respid)
     case RIL_UNSOL_RIL_CONNECTED:
         return "UNSOL_RIL_CONNECTED";
     case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED:
-        return "RIL_UNSOL_VOICE_RADIO_TECH_CHANGED";
+        return "UNSOL_VOICE_RADIO_TECH_CHANGED";
     case RIL_UNSOL_CELL_INFO_LIST:
-        return "RIL_UNSOL_CELL_INFO_LIST";
+        return "UNSOL_CELL_INFO_LIST";
     case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED:
-        return "RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED";
+        return "RESPONSE_IMS_NETWORK_STATE_CHANGED";
     case RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED:
-        return "RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED";
+        return "UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED";
     case RIL_UNSOL_SRVCC_STATE_NOTIFY:
-        return "RIL_UNSOL_SRVCC_STATE_NOTIFY";
+        return "UNSOL_SRVCC_STATE_NOTIFY";
     case RIL_UNSOL_HARDWARE_CONFIG_CHANGED:
-        return "RIL_UNSOL_HARDWARE_CONFIG_CHANGED";
+        return "HARDWARE_CONFIG_CHANGED";
     case RIL_UNSOL_DC_RT_INFO_CHANGED:
-        return "RIL_UNSOL_DC_RT_INFO_CHANGED";
+        return "UNSOL_DC_RT_INFO_CHANGED";
     case RIL_UNSOL_RADIO_CAPABILITY:
-        return "RIL_UNSOL_RADIO_CAPABILITY";
-    case RIL_UNSOL_ON_SS:
-        return "RIL_UNSOL_ON_SS";
-    case RIL_UNSOL_STK_CC_ALPHA_NOTIFY:
-        return "RIL_UNSOL_STK_CC_ALPHA_NOTIFY";
-    case RIL_UNSOL_LCEDATA_RECV:
-        return "RIL_UNSOL_LCEDATA_RECV";
-
+        return "UNSOL_RADIO_CAPABILITY";
+    case RIL_RESPONSE_ACKNOWLEDGEMENT:
+        return "RIL_RESPONSE_ACKNOWLEDGEMENT";
+    /* IMS unsolicited response */
     case RIL_UNSOL_RESPONSE_IMS_CALL_STATE_CHANGED:
-        return "RIL_UNSOL_RESPONSE_IMS_CALL_STATE_CHANGED";
+        return "UNSOL_IMS_CALL_STATE_CHANGED";
     case RIL_UNSOL_RESPONSE_VIDEO_QUALITY:
-        return "RIL_UNSOL_RESPONSE_VIDEO_QUALITY";
+        return "UNSOL_VIDEO_QUALITY";
     case RIL_UNSOL_RESPONSE_IMS_BEARER_ESTABLISTED:
-        return "RIL_UNSOL_RESPONSE_IMS_BEARER_ESTABLISTED";
+        return "UNSOL_RESPONSE_IMS_BEARER_ESTABLISTED";
     case RIL_UNSOL_IMS_HANDOVER_REQUEST:
-        return "RIL_UNSOL_IMS_HANDOVER_REQUEST";
+        return "UNSOL_IMS_HANDOVER_REQUEST";
     case RIL_UNSOL_IMS_HANDOVER_STATUS_CHANGE:
-        return "RIL_UNSOL_IMS_HANDOVER_STATUS_CHANGE";
+        return "UNSOL_IMS_HANDOVER_STATUS_CHANGE";
     case RIL_UNSOL_IMS_NETWORK_INFO_CHANGE:
-        return "RIL_UNSOL_IMS_NETWORK_INFO_CHANGE";
+        return "UNSOL_IMS_NETWORK_INFO_CHANGE";
     case RIL_UNSOL_IMS_REGISTER_ADDRESS_CHANGE:
-        return "RIL_UNSOL_IMS_REGISTER_ADDRESS_CHANGE";
+        return "UNSOL_IMS_REGISTER_ADDRESS_CHANGE";
     case RIL_UNSOL_IMS_WIFI_PARAM:
-        return "RIL_UNSOL_IMS_WIFI_PARAM";
+        return "UNSOL_IMS_WIFI_PARAM";
     case RIL_UNSOL_IMS_NETWORK_STATE_CHANGED:
-        return "RIL_UNSOL_IMS_NETWORK_STATE_CHANGED";
-
+        return "UNSOL_IMS_NETWORK_STATE_CHANGED";
+    /* videophone */
     case RIL_EXT_UNSOL_VIDEOPHONE_CODEC:
-        return "RIL_EXT_UNSOL_VIDEOPHONE_CODEC";
+        return "UNSOL_VIDEOPHONE_CODEC";
     case RIL_EXT_UNSOL_VIDEOPHONE_DSCI:
-        return "RIL_EXT_UNSOL_VIDEOPHONE_DSCI";
+        return "UNSOL_VIDEOPHONE_DSCI";
     case RIL_EXT_UNSOL_VIDEOPHONE_STRING:
-        return "RIL_EXT_UNSOL_VIDEOPHONE_STRING";
+        return "UNSOL_VIDEOPHONE_STRING";
     case RIL_EXT_UNSOL_VIDEOPHONE_REMOTE_MEDIA:
-        return "RIL_EXT_UNSOL_VIDEOPHONE_REMOTE_MEDIA";
+        return "UNSOL_VIDEOPHONE_REMOTE_MEDIA";
     case RIL_EXT_UNSOL_VIDEOPHONE_MM_RING:
-        return "RIL_EXT_UNSOL_VIDEOPHONE_MM_RING";
+        return "UNSOL_VIDEOPHONE_MM_RING";
     case RIL_EXT_UNSOL_VIDEOPHONE_RELEASING:
-        return "RIL_EXT_UNSOL_VIDEOPHONE_RELEASING";
+        return "UNSOL_VIDEOPHONE_RELEASING";
     case RIL_EXT_UNSOL_VIDEOPHONE_RECORD_VIDEO:
-        return "RIL_EXT_UNSOL_VIDEOPHONE_RECORD_VIDEO";
+        return "UNSOL_VIDEOPHONE_RECORD_VIDEO";
     case RIL_EXT_UNSOL_VIDEOPHONE_MEDIA_START:
-        return "RIL_EXT_UNSOL_VIDEOPHONE_MEDIA_START";
-    case RIL_EXT_UNSOL_ECC_NETWORKLIST_CHANGED:
-        return "RIL_EXT_UNSOL_ECC_NETWORKLIST_CHANGED";
-    case RIL_EXT_UNSOL_RAU_SUCCESS:
-        return "RIL_EXT_UNSOL_RAU_SUCCESS";
-    case RIL_EXT_UNSOL_CLEAR_CODE_FALLBACK:
-        return "RIL_EXT_UNSOL_CLEAR_CODE_FALLBACK";
-    case RIL_EXT_UNSOL_RIL_CONNECTED:
-        return "RIL_EXT_UNSOL_RIL_CONNECTED";
-    case RIL_EXT_UNSOL_SIMLOCK_STATUS_CHANGED:
-        return "RIL_EXT_UNSOL_SIMLOCK_STATUS_CHANGED";
-    case RIL_EXT_UNSOL_SIMLOCK_SIM_EXPIRED:
-        return "RIL_EXT_UNSOL_SIMLOCK_SIM_EXPIRED";
-    case RIL_EXT_UNSOL_BAND_INFO:
-        return "RIL_EXT_UNSOL_BAND_INFO";
-    case RIL_EXT_UNSOL_SWITCH_PRIMARY_CARD:
-        return "RIL_EXT_UNSOL_SWITCH_PRIMARY_CARD";
-    case RIL_EXT_UNSOL_SIM_PS_REJECT:
-        return "RIL_EXT_UNSOL_SIM_PS_REJECT";
-    case RIL_EXT_UNSOL_SETUP_DATA_FOR_CP:
-        return "RIL_EXT_UNSOL_SETUP_DATA_FOR_CP";
-    case RIL_EXT_UNSOL_SIMMGR_SIM_STATUS_CHANGED:
-        return "RIL_EXT_UNSOL_SIMMGR_SIM_STATUS_CHANGED";
-    case RIL_EXT_UNSOL_RADIO_CAPABILITY_CHANGED:
-        return "RIL_EXT_UNSOL_RADIO_CAPABILITY_CHANGED";
-    case RIL_EXT_UNSOL_EARLY_MEDIA:
-        return "RIL_EXT_UNSOL_EARLY_MEDIA";
-    case RIL_EXT_UNSOL_ATROUTER_RSP:
-        return "RIL_EXT_UNSOL_ATROUTER_RSP";
-    case RIL_EXT_UNSOL_DATA_PDP_INFO:
-        return "RIL_EXT_UNSOL_DATA_PDP_INFO";
+        return "UNSOL_VIDEOPHONE_MEDIA_START";
 
+    case RIL_EXT_UNSOL_ECC_NETWORKLIST_CHANGED:
+        return "UNSOL_ECC_NETWORKLIST_CHANGED";
+    case RIL_EXT_UNSOL_RAU_SUCCESS:
+        return "UNSOL_RAU_SUCCESS";
+    case RIL_EXT_UNSOL_CLEAR_CODE_FALLBACK:
+        return "UNSOL_CLEAR_CODE_FALLBACK";
+    case RIL_EXT_UNSOL_RIL_CONNECTED:
+        return "UNSOL_RIL_CONNECTED";
+    case RIL_EXT_UNSOL_SIMLOCK_STATUS_CHANGED:
+        return "UNSOL_SIMLOCK_STATUS_CHANGED";
+    case RIL_EXT_UNSOL_SIMLOCK_SIM_EXPIRED:
+        return "UNSOL_SIMLOCK_SIM_EXPIRED";
+    case RIL_EXT_UNSOL_BAND_INFO:
+        return "UNSOL_BAND_INFO";
+    case RIL_EXT_UNSOL_SWITCH_PRIMARY_CARD:
+        return "UNSOL_SWITCH_PRIMARY_CARD";
+    case RIL_EXT_UNSOL_SIM_PS_REJECT:
+        return "UNSOL_SIM_PS_REJECT";
+    case RIL_EXT_UNSOL_SETUP_DATA_FOR_CP:
+        return "UNSOL_SETUP_DATA_FOR_CP";
+    case RIL_EXT_UNSOL_SIMMGR_SIM_STATUS_CHANGED:
+        return "UNSOL_SIMMGR_SIM_STATUS_CHANGED";
+    case RIL_EXT_UNSOL_RADIO_CAPABILITY_CHANGED:
+        return "UNSOL_RADIO_CAPABILITY_CHANGED";
+    case RIL_EXT_UNSOL_EARLY_MEDIA:
+        return "UNSOL_EARLY_MEDIA";
+    case RIL_EXT_UNSOL_DATA_PDP_INFO:
+        return "UNSOL_DATA_PDP_INFO";
+    case RIL_EXT_UNSOL_PPP_RSP:
+        return "UNSOL_PPP_RSP";
+    case RIL_EXT_UNSOL_PPP_DATA_PDP_INFO:
+        return "UNSOL_PPP_DATA_PDP_INFO";
 #ifdef ORCA_FEATURE_5G
     case RIL_EXT_UNSOL_PHYSICAL_CHANNEL_CONFIG:
-        return "RIL_EXT_UNSOL_PHYSICAL_CHANNEL_CONFIG";
+        return "EXT_UNSOL_PHYSICAL_CHANNEL_CONFIG";
     case RIL_EXT_UNSOL_NETWORK_SCAN_RESULT:
         return "RIL_EXT_UNSOL_NETWORK_SCAN_RESULT";
     case RIL_EXT_UNSOL_SIGNAL_STRENGTH:
         return "RIL_EXT_UNSOL_SIGNAL_STRENGTH";
     case RIL_EXT_UNSOL_SIGNAL_CONN_STATUS:
-        return "RIL_EXT_UNSOL_SIGNAL_CONN_STATUS";
-    case RIL_EXT_UNSOL_PPP_RSP:
-        return "RIL_EXT_UNSOL_PPP_RSP";
-    case RIL_EXT_UNSOL_PPP_DATA_PDP_INFO:
-        return "RIL_EXT_UNSOL_PPP_DATA_PDP_INFO";
-#else
-    case RIL_EXT_UNSOL_PPP_RSP:
-        return "RIL_EXT_UNSOL_PPP_RSP";
-    case RIL_EXT_UNSOL_PPP_DATA_PDP_INFO:
-        return "RIL_EXT_UNSOL_PPP_DATA_PDP_INFO";
+        return "UNSOL_SIGNAL_CONN_STATUS";
 #endif
     default:
-        return "<unknown reponse>";
+        return "<unknown request>";
     }
 }

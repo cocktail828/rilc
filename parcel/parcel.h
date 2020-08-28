@@ -44,6 +44,8 @@ public:
     //read interface
     status_t readInt32(int32_t *pArg) const;
     int32_t readInt32() const;
+    int64_t readInt64() const;
+    status_t read(void *data, size_t len);
 
     void freeString(const char *str) const;
     const char *readString() const;
@@ -54,7 +56,9 @@ public:
 
     //write interface
     status_t writeInt32(int32_t val);
+    status_t writeInt64(int64_t val);
     status_t writeString(const char *str);
+    status_t write(const void *data, size_t len);
     void *writeInplace(size_t len);
 
 private:

@@ -1205,17 +1205,17 @@ typedef struct
 /* Deprecated, use RIL_CDMA_CallWaiting_v6 */
 typedef struct
 {
-    char *number;           /* Remote party number */
+    const char *number;     /* Remote party number */
     int numberPresentation; /* 0=Allowed, 1=Restricted, 2=Not Specified/Unknown */
-    char *name;             /* Remote party name */
+    const char *name;       /* Remote party name */
     RIL_CDMA_SignalInfoRecord signalInfoRecord;
 } RIL_CDMA_CallWaiting_v5;
 
 typedef struct
 {
-    char *number;           /* Remote party number */
+    const char *number;     /* Remote party number */
     int numberPresentation; /* 0=Allowed, 1=Restricted, 2=Not Specified/Unknown */
-    char *name;             /* Remote party name */
+    const char *name;       /* Remote party name */
     RIL_CDMA_SignalInfoRecord signalInfoRecord;
     /* Number type/Number plan required to support International Call Waiting */
     int number_type; /* 0=Unknown, 1=International, 2=National,
@@ -4659,6 +4659,7 @@ typedef enum
  *
  */
 #define RIL_REQUEST_GSM_GET_BROADCAST_SMS_CONFIG 89
+#define RIL_REQUEST_GSM_GET_BROADCAST_CONFIG 89
 
 /**
  * RIL_REQUEST_GSM_SET_BROADCAST_SMS_CONFIG
@@ -4684,6 +4685,7 @@ typedef enum
  *
  */
 #define RIL_REQUEST_GSM_SET_BROADCAST_SMS_CONFIG 90
+#define RIL_REQUEST_GSM_SET_BROADCAST_CONFIG 90
 
 /**
  * RIL_REQUEST_GSM_SMS_BROADCAST_ACTIVATION
@@ -4710,6 +4712,7 @@ typedef enum
  *
  */
 #define RIL_REQUEST_GSM_SMS_BROADCAST_ACTIVATION 91
+#define RIL_REQUEST_GSM_BROADCAST_ACTIVATION 91
 
 /**
  * RIL_REQUEST_CDMA_GET_BROADCAST_SMS_CONFIG
@@ -4735,6 +4738,7 @@ typedef enum
  *
  */
 #define RIL_REQUEST_CDMA_GET_BROADCAST_SMS_CONFIG 92
+#define RIL_REQUEST_CDMA_GET_BROADCAST_CONFIG 92
 
 /**
  * RIL_REQUEST_CDMA_SET_BROADCAST_SMS_CONFIG
@@ -4760,6 +4764,7 @@ typedef enum
  *
  */
 #define RIL_REQUEST_CDMA_SET_BROADCAST_SMS_CONFIG 93
+#define RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG 93
 
 /**
  * RIL_REQUEST_CDMA_SMS_BROADCAST_ACTIVATION
@@ -4786,6 +4791,7 @@ typedef enum
  *
  */
 #define RIL_REQUEST_CDMA_SMS_BROADCAST_ACTIVATION 94
+#define RIL_REQUEST_CDMA_BROADCAST_ACTIVATION 94
 
 /**
  * RIL_REQUEST_CDMA_SUBSCRIPTION

@@ -19,15 +19,17 @@ std::mutex RILRequest::mGlobalLock;
 RILResponse RILRequest::mUnsocilitedResponse;
 int RILRequest::mRilVersion = 0;
 
-static std::string requestidToString(int id)
+static std::string requestidToString(int cmdid)
 {
-    return std::to_string(id);
+    return std::to_string(cmdid);
 }
 
 std::string commandidToString(int cid)
 {
     switch (cid)
     {
+    case RIL_EXT_UNSOL_ATROUTER_RSP:
+        return "AT_ROUTER_RSP";
     case RIL_REQUEST_GET_SIM_STATUS:
         return "GET_SIM_STATUS";
     case RIL_REQUEST_ENTER_SIM_PIN:
@@ -57,7 +59,7 @@ std::string commandidToString(int cid)
     case RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND:
         return "HANGUP_FOREGROUND_RESUME_BACKGROUND";
     case RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE:
-        return "REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE";
+        return "SWITCH_WAITING_OR_HOLDING_AND_ACTIVE";
     case RIL_REQUEST_CONFERENCE:
         return "CONFERENCE";
     case RIL_REQUEST_UDUB:
@@ -132,6 +134,12 @@ std::string commandidToString(int cid)
         return "BASEBAND_VERSION";
     case RIL_REQUEST_SEPARATE_CONNECTION:
         return "SEPARATE_CONNECTION";
+    case RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE:
+        return "SET_PREFERRED_NETWORK_TYPE";
+    case RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE:
+        return "GET_PREFERRED_NETWORK_TYPE";
+    case RIL_REQUEST_GET_NEIGHBORING_CELL_IDS:
+        return "GET_NEIGHBORING_CELL_IDS";
     case RIL_REQUEST_SET_MUTE:
         return "SET_MUTE";
     case RIL_REQUEST_GET_MUTE:
@@ -148,347 +156,323 @@ std::string commandidToString(int cid)
         return "OEM_HOOK_RAW";
     case RIL_REQUEST_OEM_HOOK_STRINGS:
         return "OEM_HOOK_STRINGS";
-    case RIL_REQUEST_SCREEN_STATE:
-        return "SCREEN_STATE";
-    case RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION:
-        return "SET_SUPP_SVC_NOTIFICATION";
-    case RIL_REQUEST_WRITE_SMS_TO_SIM:
-        return "WRITE_SMS_TO_SIM";
-    case RIL_REQUEST_DELETE_SMS_ON_SIM:
-        return "DELETE_SMS_ON_SIM";
     case RIL_REQUEST_SET_BAND_MODE:
         return "SET_BAND_MODE";
     case RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE:
         return "QUERY_AVAILABLE_BAND_MODE";
     case RIL_REQUEST_STK_GET_PROFILE:
-        return "REQUEST_STK_GET_PROFILE";
+        return "STK_GET_PROFILE";
     case RIL_REQUEST_STK_SET_PROFILE:
-        return "REQUEST_STK_SET_PROFILE";
+        return "STK_SET_PROFILE";
     case RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND:
-        return "REQUEST_STK_SEND_ENVELOPE_COMMAND";
+        return "STK_SEND_ENVELOPE_COMMAND";
     case RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE:
-        return "REQUEST_STK_SEND_TERMINAL_RESPONSE";
+        return "STK_SEND_TERMINAL_RESPONSE";
     case RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM:
-        return "REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM";
+        return "STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM";
+    case RIL_REQUEST_SCREEN_STATE:
+        return "SCREEN_STATE";
     case RIL_REQUEST_EXPLICIT_CALL_TRANSFER:
-        return "REQUEST_EXPLICIT_CALL_TRANSFER";
-    case RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE:
-        return "REQUEST_SET_PREFERRED_NETWORK_TYPE";
-    case RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE:
-        return "REQUEST_GET_PREFERRED_NETWORK_TYPE";
-    case RIL_REQUEST_GET_NEIGHBORING_CELL_IDS:
-        return "REQUEST_GET_NEIGHBORING_CELL_IDS";
+        return "EXPLICIT_CALL_TRANSFER";
     case RIL_REQUEST_SET_LOCATION_UPDATES:
-        return "REQUEST_SET_LOCATION_UPDATES";
+        return "SET_LOCATION_UPDATES";
     case RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE:
-        return "RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE";
+        return "CDMA_SET_SUBSCRIPTION_SOURCE";
     case RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE:
-        return "RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE";
+        return "CDMA_SET_ROAMING_PREFERENCE";
     case RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE:
-        return "RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE";
+        return "CDMA_QUERY_ROAMING_PREFERENCE";
     case RIL_REQUEST_SET_TTY_MODE:
-        return "RIL_REQUEST_SET_TTY_MODE";
+        return "SET_TTY_MODE";
     case RIL_REQUEST_QUERY_TTY_MODE:
-        return "RIL_REQUEST_QUERY_TTY_MODE";
+        return "QUERY_TTY_MODE";
     case RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE:
-        return "RIL_REQUEST_CDMA_SET_PREFEthisED_VOICE_PRIVACY_MODE";
+        return "CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE";
     case RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE:
-        return "RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE";
+        return "CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE";
     case RIL_REQUEST_CDMA_FLASH:
-        return "RIL_REQUEST_CDMA_FLASH";
+        return "CDMA_FLASH";
     case RIL_REQUEST_CDMA_BURST_DTMF:
-        return "RIL_REQUEST_CDMA_BURST_DTMF";
-    case RIL_REQUEST_CDMA_VALIDATE_AND_WRITE_AKEY:
-        return "RIL_REQUEST_CDMA_VALIDATE_AND_WRITE_AKEY";
+        return "CDMA_BURST_DTMF";
     case RIL_REQUEST_CDMA_SEND_SMS:
-        return "RIL_REQUEST_CDMA_SEND_SMS";
+        return "CDMA_SEND_SMS";
     case RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE:
-        return "RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE";
+        return "CDMA_SMS_ACKNOWLEDGE";
     case RIL_REQUEST_GSM_GET_BROADCAST_SMS_CONFIG:
-        return "RIL_REQUEST_GSM_GET_BROADCAST_SMS_CONFIG";
+        return "GSM_GET_BROADCAST_SMS_CONFIG";
     case RIL_REQUEST_GSM_SET_BROADCAST_SMS_CONFIG:
-        return "RIL_REQUEST_GSM_SET_BROADCAST_SMS_CONFIG";
-    case RIL_REQUEST_GSM_SMS_BROADCAST_ACTIVATION:
-        return "RIL_REQUEST_GSM_SMS_BROADCAST_ACTIVATION";
+        return "GSM_SET_BROADCAST_SMS_CONFIG";
     case RIL_REQUEST_CDMA_GET_BROADCAST_SMS_CONFIG:
-        return "RIL_REQUEST_CDMA_GET_BROADCAST_SMS_CONFIG";
+        return "CDMA_GET_BROADCAST_SMS_CONFIG";
     case RIL_REQUEST_CDMA_SET_BROADCAST_SMS_CONFIG:
-        return "RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG";
+        return "CDMA_SET_BROADCAST_SMS_CONFIG";
     case RIL_REQUEST_CDMA_SMS_BROADCAST_ACTIVATION:
-        return "RIL_REQUEST_CDMA_SMS_BROADCAST_ACTIVATION";
+        return "CDMA_SMS_BROADCAST_ACTIVATION";
+    case RIL_REQUEST_CDMA_VALIDATE_AND_WRITE_AKEY:
+        return "CDMA_VALIDATE_AND_WRITE_AKEY";
     case RIL_REQUEST_CDMA_SUBSCRIPTION:
-        return "RIL_REQUEST_CDMA_SUBSCRIPTION";
+        return "CDMA_SUBSCRIPTION";
     case RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM:
-        return "RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM";
+        return "CDMA_WRITE_SMS_TO_RUIM";
     case RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM:
-        return "RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM";
+        return "CDMA_DELETE_SMS_ON_RUIM";
     case RIL_REQUEST_DEVICE_IDENTITY:
-        return "RIL_REQUEST_DEVICE_IDENTITY";
-    case RIL_REQUEST_GET_SMSC_ADDRESS:
-        return "RIL_REQUEST_GET_SMSC_ADDRESS";
-    case RIL_REQUEST_SET_SMSC_ADDRESS:
-        return "RIL_REQUEST_SET_SMSC_ADDRESS";
+        return "DEVICE_IDENTITY";
     case RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE:
-        return "REQUEST_EXIT_EMERGENCY_CALLBACK_MODE";
+        return "EXIT_EMERGENCY_CALLBACK_MODE";
+    case RIL_REQUEST_GET_SMSC_ADDRESS:
+        return "GET_SMSC_ADDRESS";
+    case RIL_REQUEST_SET_SMSC_ADDRESS:
+        return "SET_SMSC_ADDRESS";
     case RIL_REQUEST_REPORT_SMS_MEMORY_STATUS:
-        return "RIL_REQUEST_REPORT_SMS_MEMORY_STATUS";
+        return "REPORT_SMS_MEMORY_STATUS";
     case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING:
-        return "RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING";
+        return "REPORT_STK_SERVICE_IS_RUNNING";
     case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE:
-        return "RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE";
+        return "CDMA_GET_SUBSCRIPTION_SOURCE";
     case RIL_REQUEST_ISIM_AUTHENTICATION:
-        return "RIL_REQUEST_ISIM_AUTHENTICATION";
+        return "ISIM_AUTHENTICATION";
     case RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU:
         return "RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU";
     case RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS:
         return "RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS";
     case RIL_REQUEST_VOICE_RADIO_TECH:
-        return "RIL_REQUEST_VOICE_RADIO_TECH";
+        return "VOICE_RADIO_TECH";
+    case RIL_REQUEST_WRITE_SMS_TO_SIM:
+        return "WRITE_SMS_TO_SIM";
     case RIL_REQUEST_GET_CELL_INFO_LIST:
-        return "RIL_REQUEST_GET_CELL_INFO_LIST";
+        return "GET_CELL_INFO_LIST";
     case RIL_REQUEST_SET_UNSOL_CELL_INFO_LIST_RATE:
-        return "RIL_REQUEST_SET_UNSOL_CELL_INFO_LIST_RATE";
+        return "SET_UNSOL_CELL_INFO_LIST_RATE";
     case RIL_REQUEST_SET_INITIAL_ATTACH_APN:
         return "RIL_REQUEST_SET_INITIAL_ATTACH_APN";
     case RIL_REQUEST_IMS_REGISTRATION_STATE:
-        return "RIL_REQUEST_IMS_REGISTRATION_STATE";
+        return "IMS_REGISTRATION_STATE";
     case RIL_REQUEST_IMS_SEND_SMS:
-        return "RIL_REQUEST_IMS_SEND_SMS";
+        return "IMS_SEND_SMS";
     case RIL_REQUEST_SIM_TRANSMIT_APDU_BASIC:
-        return "RIL_REQUEST_SIM_TRANSMIT_APDU_BASIC";
+        return "SIM_TRANSMIT_APDU_BASIC";
     case RIL_REQUEST_SIM_OPEN_CHANNEL:
-        return "RIL_REQUEST_SIM_OPEN_CHANNEL";
+        return "SIM_OPEN_CHANNEL";
     case RIL_REQUEST_SIM_CLOSE_CHANNEL:
-        return "RIL_REQUEST_SIM_CLOSE_CHANNEL";
+        return "SIM_CLOSE_CHANNEL";
     case RIL_REQUEST_SIM_TRANSMIT_APDU_CHANNEL:
-        return "RIL_REQUEST_SIM_TRANSMIT_APDU_CHANNEL";
-    case RIL_REQUEST_NV_READ_ITEM:
-        return "RIL_REQUEST_NV_READ_ITEM";
-    case RIL_REQUEST_NV_WRITE_ITEM:
-        return "RIL_REQUEST_NV_WRITE_ITEM";
-    case RIL_REQUEST_NV_WRITE_CDMA_PRL:
-        return "RIL_REQUEST_NV_WRITE_CDMA_PRL";
-    case RIL_REQUEST_NV_RESET_CONFIG:
-        return "RIL_REQUEST_NV_RESET_CONFIG";
-    case RIL_REQUEST_SET_UICC_SUBSCRIPTION:
-        return "RIL_REQUEST_SET_UICC_SUBSCRIPTION";
-    case RIL_REQUEST_ALLOW_DATA:
-        return "RIL_REQUEST_ALLOW_DATA";
-    case RIL_REQUEST_GET_HARDWARE_CONFIG:
-        return "RIL_REQUEST_GET_HARDWARE_CONFIG";
-    case RIL_REQUEST_SIM_AUTHENTICATION:
-        return "RIL_REQUEST_SIM_AUTHENTICATION";
-    case RIL_REQUEST_GET_DC_RT_INFO:
-        return "RIL_REQUEST_GET_DC_RT_INFO";
-    case RIL_REQUEST_SET_DC_RT_INFO_RATE:
-        return "RIL_REQUEST_SET_DC_RT_INFO_RATE";
-    case RIL_REQUEST_SET_DATA_PROFILE:
-        return "RIL_REQUEST_SET_DATA_PROFILE";
-    case RIL_REQUEST_SHUTDOWN:
-        return "RIL_REQUEST_SHUTDOWN";
+        return "SIM_TRANSMIT_APDU_CHANNEL";
     case RIL_REQUEST_GET_RADIO_CAPABILITY:
-        return "RIL_REQUEST_GET_RADIO_CAPABILITY";
+        return "GET_RADIO_CAPABILITY";
     case RIL_REQUEST_SET_RADIO_CAPABILITY:
-        return "RIL_REQUEST_SET_RADIO_CAPABILITY";
+        return "SET_RADIO_CAPABILITY";
     case RIL_REQUEST_START_LCE:
-        return "RIL_REQUEST_START_LCE";
+        return "START_LCE";
     case RIL_REQUEST_STOP_LCE:
-        return "RIL_REQUEST_STOP_LCE";
-    case RIL_REQUEST_PULL_LCEDATA:
-        return "RIL_REQUEST_PULL_LCEDATA";
-    case RIL_REQUEST_GET_ACTIVITY_INFO:
-        return "RIL_REQUEST_GET_ACTIVITY_INFO";
-
-        /**
-         * IMS REQUESTS
-         */
+        return "STOP_LCE";
+    case RIL_REQUEST_SET_UICC_SUBSCRIPTION:
+        return "SET_UICC_SUBSCRIPTION";
+    case RIL_REQUEST_ALLOW_DATA:
+        return "ALLOW_DATA";
+    case RIL_REQUEST_GET_HARDWARE_CONFIG:
+        return "GET_HARDWARE_CONFIG";
+    case RIL_REQUEST_SIM_AUTHENTICATION:
+        return "SIM_AUTHENTICATION";
+    case RIL_REQUEST_GET_DC_RT_INFO:
+        return "GET_DC_RT_INFO";
+    case RIL_REQUEST_SET_DC_RT_INFO_RATE:
+        return "SET_DC_RT_INFO_RATE";
+    case RIL_REQUEST_SET_DATA_PROFILE:
+        return "SET_DATA_PROFILE";
+    case RIL_REQUEST_SHUTDOWN:
+        return "SHUTDOWN";
+    /* IMS */
     case RIL_REQUEST_GET_IMS_CURRENT_CALLS:
-        return "RIL_REQUEST_GET_IMS_CURRENT_CALLS";
+        return "GET_IMS_CURRENT_CALLS";
     case RIL_REQUEST_SET_IMS_VOICE_CALL_AVAILABILITY:
-        return "RIL_REQUEST_SET_IMS_VOICE_CALL_AVAILABILITY";
+        return "SET_IMS_VOICE_CALL_AVAILABILITY";
     case RIL_REQUEST_GET_IMS_VOICE_CALL_AVAILABILITY:
-        return "RIL_REQUEST_GET_IMS_VOICE_CALL_AVAILABILITY";
+        return "GET_IMS_VOICE_CALL_AVAILABILITY";
     case RIL_REQUEST_INIT_ISIM:
-        return "RIL_REQUEST_INIT_ISIM";
+        return "INIT_ISIM";
     case RIL_REQUEST_IMS_CALL_REQUEST_MEDIA_CHANGE:
-        return "RIL_REQUEST_IMS_CALL_REQUEST_MEDIA_CHANGE";
+        return "IMS_CALL_REQUEST_MEDIA_CHANGE";
     case RIL_REQUEST_IMS_CALL_RESPONSE_MEDIA_CHANGE:
-        return "RIL_REQUEST_IMS_CALL_RESPONSE_MEDIA_CHANGE";
+        return "IMS_CALL_RESPONSE_MEDIA_CHANGE";
     case RIL_REQUEST_SET_IMS_SMSC:
-        return "RIL_REQUEST_SET_IMS_SMSC";
+        return "SET_IMS_SMSC";
     case RIL_REQUEST_IMS_CALL_FALL_BACK_TO_VOICE:
-        return "RIL_REQUEST_IMS_CALL_FALL_BACK_TO_VOICE";
+        return "IMS_CALL_FALL_BACK_TO_VOICE";
     case RIL_REQUEST_SET_IMS_INITIAL_ATTACH_APN:
-        return "RIL_REQUEST_SET_IMS_INITIAL_ATTACH_APN";
+        return "SET_IMS_INITIAL_ATTACH_APN";
     case RIL_REQUEST_QUERY_CALL_FORWARD_STATUS_URI:
-        return "RIL_REQUEST_QUERY_CALL_FORWARD_STATUS_URI";
+        return "QUERY_CALL_FORWARD_STATUS_URI";
     case RIL_REQUEST_SET_CALL_FORWARD_URI:
-        return "RIL_REQUEST_SET_CALL_FORWARD_URI";
+        return "SET_CALL_FORWARD_URI";
     case RIL_REQUEST_IMS_INITIAL_GROUP_CALL:
-        return "RIL_REQUEST_IMS_INITIAL_GROUP_CALL";
+        return "IMS_INITIAL_GROUP_CALL";
     case RIL_REQUEST_IMS_ADD_TO_GROUP_CALL:
-        return "RIL_REQUEST_IMS_ADD_TO_GROUP_CALL";
+        return "IMS_ADD_TO_GROUP_CALL";
     case RIL_REQUEST_VIDEOPHONE_DIAL:
-        return "RIL_REQUEST_VIDEOPHONE_DIAL";
+        return "VIDEOPHONE_DIAL";
     case RIL_REQUEST_ENABLE_IMS:
-        return "RIL_REQUEST_ENABLE_IMS";
+        return "ENABLE_IMS";
     case RIL_REQUEST_DISABLE_IMS:
-        return "RIL_REQUEST_DISABLE_IMS";
+        return "DISABLE_IMS";
     case RIL_REQUEST_GET_IMS_BEARER_STATE:
-        return "RIL_REQUEST_GET_IMS_BEARER_STATE";
+        return "GET_IMS_BEARER_STATE";
     case RIL_REQUEST_VIDEOPHONE_CODEC:
-        return "RIL_REQUEST_VIDEOPHONE_CODEC";
+        return "VIDEOPHONE_CODEC";
     case RIL_REQUEST_SET_SOS_INITIAL_ATTACH_APN:
-        return "RIL_REQUEST_SET_SOS_INITIAL_ATTACH_APN";
+        return "SET_SOS_INITIAL_ATTACH_APN";
     case RIL_REQUEST_IMS_HANDOVER:
-        return "RIL_REQUEST_IMS_HANDOVER";
+        return "IMS_HANDOVER";
     case RIL_REQUEST_IMS_HANDOVER_STATUS_UPDATE:
-        return "RIL_REQUEST_IMS_HANDOVER_STATUS_UPDATE";
+        return "IMS_HANDOVER_STATUS_UPDATE";
     case RIL_REQUEST_IMS_NETWORK_INFO_CHANGE:
-        return "RIL_REQUEST_IMS_NETWORK_INFO_CHANGE";
+        return "IMS_NETWORK_INFO_CHANGE";
     case RIL_REQUEST_IMS_HANDOVER_CALL_END:
-        return "RIL_REQUEST_IMS_HANDOVER_CALL_END";
-    case RIL_REQUEST_GET_TPMR_STATE:
-        return "RIL_REQUEST_GET_TPMR_STATE";
-    case RIL_REQUEST_SET_TPMR_STATE:
-        return "RIL_REQUEST_SET_TPMR_STATE";
+        return "IMS_HANDOVER_CALL_END";
     case RIL_REQUEST_IMS_WIFI_ENABLE:
-        return "RIL_REQUEST_IMS_WIFI_ENABLE";
+        return "IMS_WIFI_ENABLE";
     case RIL_REQUEST_IMS_WIFI_CALL_STATE_CHANGE:
-        return "RIL_REQUEST_IMS_WIFI_CALL_STATE_CHANGE";
+        return "IMS_WIFI_CALL_STATE_CHANGE";
     case RIL_REQUEST_IMS_UPDATE_DATA_ROUTER:
-        return "RIL_REQUEST_IMS_UPDATE_DATA_ROUTER";
+        return "IMS_UPDATE_DATA_ROUTER";
+    case RIL_REQUEST_GET_TPMR_STATE:
+        return "GET_TPMR_STATE";
+    case RIL_REQUEST_SET_TPMR_STATE:
+        return "SET_TPMR_STATE";
     case RIL_REQUEST_IMS_HOLD_SINGLE_CALL:
-        return "RIL_REQUEST_IMS_HOLD_SINGLE_CALL";
+        return "IMS_HOLD_SINGLE_CALL";
     case RIL_REQUEST_IMS_MUTE_SINGLE_CALL:
-        return "RIL_REQUEST_IMS_MUTE_SINGLE_CALL";
+        return "IMS_MUTE_SINGLE_CALL";
     case RIL_REQUEST_IMS_SILENCE_SINGLE_CALL:
-        return "RIL_REQUEST_IMS_SILENCE_SINGLE_CALL";
+        return "IMS_SILENCE_SINGLE_CALL";
     case RIL_REQUEST_IMS_ENABLE_LOCAL_CONFERENCE:
-        return "RIL_REQUEST_IMS_ENABLE_LOCAL_CONFERENCE";
+        return "ENABLE_LOCAL_CONFERENCE";
     case RIL_REQUEST_IMS_NOTIFY_HANDOVER_CALL_INFO:
-        return "RIL_REQUEST_IMS_NOTIFY_HANDOVER_CALL_INFO";
+        return "IMS_NOTIFY_HANDOVER_CALL_INFO";
     case RIL_REQUEST_GET_IMS_SRVCC_CAPBILITY:
-        return "RIL_REQUEST_GET_IMS_SRVCC_CAPBILITY";
+        return "GET_IMS_SRVCC_CAPBILITY";
     case RIL_REQUEST_GET_IMS_PCSCF_ADDR:
-        return "RIL_REQUEST_GET_IMS_PCSCF_ADDR";
+        return "GET_IMS_PCSCF_ADDR";
     case RIL_REQUEST_SET_VOWIFI_PCSCF_ADDR:
-        return "RIL_REQUEST_SET_VOWIFI_PCSCF_ADDR";
+        return "SET_VOWIFI_PCSCF_ADDR";
     case RIL_REQUEST_IMS_UPDATE_CLIP:
-        return "RIL_REQUEST_IMS_UPDATE_CLIP";
+        return "IMS_UPDATE_CLIP";
     case RIL_REQUEST_IMS_REGADDR:
-        return "RIL_REQUEST_IMS_REGADDR";
+        return "IMS_REGADDR";
+    /* OEM SOCKET REQUEST */
+    /* videophone */
     case RIL_EXT_REQUEST_VIDEOPHONE_DIAL:
-        return "RIL_EXT_REQUEST_VIDEOPHONE_DIAL";
+        return "VIDEOPHONE_DIAL";
     case RIL_EXT_REQUEST_VIDEOPHONE_CODEC:
-        return "RIL_EXT_REQUEST_VIDEOPHONE_CODEC";
+        return "VIDEOPHONE_CODEC";
     case RIL_EXT_REQUEST_VIDEOPHONE_FALLBACK:
-        return "RIL_EXT_REQUEST_VIDEOPHONE_FALLBACK";
+        return "VIDEOPHONE_FALLBACK";
     case RIL_EXT_REQUEST_VIDEOPHONE_STRING:
-        return "RIL_EXT_REQUEST_VIDEOPHONE_STRING";
+        return "VIDEOPHONE_STRING";
     case RIL_EXT_REQUEST_VIDEOPHONE_LOCAL_MEDIA:
-        return "RIL_EXT_REQUEST_VIDEOPHONE_LOCAL_MEDIA";
+        return "VIDEOPHONE_LOCAL_MEDIA";
     case RIL_EXT_REQUEST_VIDEOPHONE_CONTROL_IFRAME:
-        return "RIL_EXT_REQUEST_VIDEOPHONE_CONTROL_IFRAME";
+        return "VIDEOPHONE_CONTROL_IFRAME";
+
     case RIL_EXT_REQUEST_SWITCH_MULTI_CALL:
-        return "RIL_EXT_REQUEST_SWITCH_MULTI_CALL";
+        return "SWITCH_MULTI_CALL";
     case RIL_EXT_REQUEST_TRAFFIC_CLASS:
-        return "RIL_EXT_REQUEST_TRAFFIC_CLASS";
+        return "TRAFFIC_CLASS";
     case RIL_EXT_REQUEST_ENABLE_LTE:
-        return "RIL_EXT_REQUEST_ENABLE_LTE";
+        return "ENABLE_LTE";
     case RIL_EXT_REQUEST_ATTACH_DATA:
-        return "RIL_EXT_REQUEST_ATTACH_DATA";
+        return "ATTACH_DATA";
     case RIL_EXT_REQUEST_STOP_QUERY_NETWORK:
-        return "RIL_EXT_REQUEST_STOP_QUERY_NETWORK";
+        return "STOP_QUERY_NETWORK";
     case RIL_EXT_REQUEST_FORCE_DETACH:
-        return "RIL_EXT_REQUEST_FORCE_DETACH";
+        return "FORCE_DETACH";
     case RIL_EXT_REQUEST_GET_HD_VOICE_STATE:
-        return "RIL_EXT_REQUEST_GET_HD_VOICE_STATE";
+        return "GET_HD_VOICE_STATE";
     case RIL_EXT_REQUEST_SIMMGR_SIM_POWER:
-        return "RIL_EXT_REQUEST_SIMMGR_SIM_POWER";
+        return "SIMMGR_SIM_POWER";
     case RIL_EXT_REQUEST_ENABLE_RAU_NOTIFY:
-        return "RIL_EXT_REQUEST_ENABLE_RAU_NOTIFY";
+        return "ENABLE_RAU_NOTIFY";
     case RIL_EXT_REQUEST_SET_COLP:
-        return "RIL_EXT_REQUEST_SET_COLP";
+        return "SET_COLP";
     case RIL_EXT_REQUEST_GET_DEFAULT_NAN:
-        return "RIL_EXT_REQUEST_GET_DEFAULT_NAN";
+        return "GET_DEFAULT_NAN";
     case RIL_EXT_REQUEST_SIM_GET_ATR:
-        return "RIL_EXT_REQUEST_SIM_GET_ATR";
+        return "SIM_GET_ATR";
     case RIL_EXT_REQUEST_SIM_OPEN_CHANNEL_WITH_P2:
-        return "RIL_EXT_REQUEST_SIM_OPEN_CHANNEL_WITH_P2";
+        return "OPEN_CHANNEL_WITH_P2";
     case RIL_EXT_REQUEST_GET_SIM_CAPACITY:
-        return "RIL_EXT_REQUEST_GET_SIM_CAPACITY";
+        return "GET_SIM_CAPACITY";
     case RIL_EXT_REQUEST_STORE_SMS_TO_SIM:
-        return "RIL_EXT_REQUEST_STORE_SMS_TO_SIM";
+        return "STORE_SMS_TO_SIM";
     case RIL_EXT_REQUEST_QUERY_SMS_STORAGE_MODE:
-        return "RIL_EXT_REQUEST_QUERY_SMS_STORAGE_MODE";
+        return "QUERY_SMS_STORAGE_MODE";
     case RIL_EXT_REQUEST_GET_SIMLOCK_REMAIN_TIMES:
-        return "RIL_EXT_REQUEST_GET_SIMLOCK_REMAIN_TIMES";
+        return "GET_SIMLOCK_REMAIN_TIMES";
     case RIL_EXT_REQUEST_SET_FACILITY_LOCK_FOR_USER:
-        return "RIL_EXT_REQUEST_SET_FACILITY_LOCK_FOR_USER";
+        return "SET_FACILITY_LOCK_FOR_USER";
     case RIL_EXT_REQUEST_GET_SIMLOCK_STATUS:
-        return "RIL_EXT_REQUEST_GET_SIMLOCK_STATUS";
+        return "GET_SIMLOCK_STATUS";
     case RIL_EXT_REQUEST_GET_SIMLOCK_DUMMYS:
-        return "RIL_EXT_REQUEST_GET_SIMLOCK_DUMMYS";
+        return "GET_SIMLOCK_DUMMYS";
     case RIL_EXT_REQUEST_GET_SIMLOCK_WHITE_LIST:
-        return "RIL_EXT_REQUEST_GET_SIMLOCK_WHITE_LIST";
+        return "GET_SIMLOCK_WHITE_LIST";
     case RIL_EXT_REQUEST_UPDATE_ECCLIST:
-        return "RIL_EXT_REQUEST_UPDATE_ECCLIST";
+        return "UPDATE_ECCLIST";
     case RIL_EXT_REQUEST_GET_BAND_INFO:
-        return "RIL_EXT_REQUEST_GET_BAND_INFO";
+        return "GET_BAND_INFO";
     case RIL_EXT_REQUEST_SET_BAND_INFO_MODE:
-        return "RIL_EXT_REQUEST_SET_BAND_INFO_MODE";
+        return "SET_BAND_INFO_MODE";
     case RIL_EXT_REQUEST_SET_SINGLE_PDN:
-        return "RIL_EXT_REQUEST_SET_SINGLE_PDN";
+        return "SET_SINGLE_PDN";
     case RIL_EXT_REQUEST_SET_SPECIAL_RATCAP:
-        return "RIL_EXT_REQUEST_SET_SPECIAL_RATCAP";
+        return "SET_SPECIAL_RATCAP";
     case RIL_EXT_REQUEST_QUERY_COLP:
-        return "RIL_EXT_REQUEST_QUERY_COLP";
+        return "QUERY_COLP";
     case RIL_EXT_REQUEST_QUERY_COLR:
-        return "RIL_EXT_REQUEST_QUERY_COLR";
+        return "QUERY_COLR";
     case RIL_EXT_REQUEST_MMI_ENTER_SIM:
-        return "RIL_EXT_REQUEST_MMI_ENTER_SIM";
+        return "MMI_ENTER_SIM";
     case RIL_EXT_REQUEST_UPDATE_OPERATOR_NAME:
-        return "RIL_EXT_REQUEST_UPDATE_OPERATOR_NAME";
+        return "UPDATE_OPERATOR_NAME";
     case RIL_EXT_REQUEST_SIMMGR_GET_SIM_STATUS:
-        return "RIL_EXT_REQUEST_SIMMGR_GET_SIM_STATUS";
+        return "SIMMGR_GET_SIM_STATUS";
     case RIL_EXT_REQUEST_SET_XCAP_IP_ADDR:
-        return "RIL_EXT_REQUEST_SET_XCAP_IP_ADDR";
+        return "SET_XCAP_IP_ADDR";
     case RIL_EXT_REQUEST_REATTACH:
-        return "RIL_EXT_REQUEST_REATTACH";
+        return "REATTACH";
     case RIL_EXT_REQUEST_SET_VOICE_DOMAIN:
-        return "RIL_EXT_REQUEST_SET_VOICE_DOMAIN";
+        return "SET_VOICE_DOMAIN";
     case RIL_EXT_REQUEST_SET_SMS_BEARER:
-        return "RIL_EXT_REQUEST_SET_SMS_BEARER";
+        return "SET_SMS_BEARER";
     case RIL_EXT_REQUEST_SET_IMEI:
-        return "RIL_EXT_REQUEST_SET_IMEI";
+        return "SET_IMEI";
     case RIL_EXT_REQUEST_SET_IMEISV:
-        return "RIL_EXT_REQUEST_SET_IMEISV";
+        return "SET_IMEISV";
     case RIL_EXT_REQUEST_QUERY_LTE_CTCC:
-        return "RIL_EXT_REQUEST_QUERY_LTE_CTCC";
+        return "QUERY_LTE_CTCC";
     case RIL_EXT_REQUEST_QUERY_LTE_CTCC_SINR:
-        return "RIL_EXT_REQUEST_QUERY_LTE_CTCC_SINR";
+        return "QUERY_LTE_CTCC_SINR";
     case RIL_EXT_REQUEST_QUERY_LTE_CTCC_MMEI:
-        return "RIL_EXT_REQUEST_QUERY_LTE_CTCC_MMEI";
+        return "QUERY_LTE_CTCC_MMEI";
     case RIL_EXT_REQUEST_SET_GSM_BAND:
-        return "RIL_EXT_REQUEST_SET_GSM_BAND";
+        return "SET_GSM_BAND";
     case RIL_EXT_REQUEST_SET_WCDMA_BAND:
-        return "RIL_EXT_REQUEST_SET_WCDMA_BAND";
+        return "SET_WCDMA_BAND";
     case RIL_EXT_REQUEST_SET_LTE_BAND:
-        return "RIL_EXT_REQUEST_SET_LTE_BAND";
+        return "SET_LTE_BAND";
 #ifdef ORCA_FEATURE_5G
     case RIL_EXT_REQUEST_DATA_REGISTRATION_STATE:
-        return "RIL_EXT_REQUEST_DATA_REGISTRATION_STATE";
+        return "EXT_REQUEST_DATA_REGISTRATION_STATE";
     case RIL_EXT_REQUEST_EVALUATE_URSP:
-        return "RIL_EXT_REQUEST_EVALUATE_URSP";
+        return "EXT_REQUEST_EVALUATE_URSP";
     case RIL_EXT_REQUEST_SETUP_DATA_CALL:
-        return "RIL_EXT_REQUEST_SETUP_DATA_CALL";
+        return "EXT_REQUEST_SETUP_DATA_CALL";
     case RIL_EXT_REQUEST_GET_CELL_INFO_LIST:
-        return "RIL_EXT_REQUEST_GET_CELL_INFO_LIST";
+        return "EXT_REQUEST_GET_CELL_INFO_LIST";
     case RIL_EXT_REQUEST_SIGNAL_STRENGTH:
-        return "RIL_EXT_REQUEST_SIGNAL_STRENGTH";
+        return "EXT_REQUEST_SIGNAL_STRENGTH";
     case RIL_EXT_REQUEST_SET_NR_BAND:
-        return "RIL_EXT_REQUEST_SET_NR_BAND";
+        return "EXT_REQUEST_SET_NR_BAND";
 #endif
     default:
         return "<unknown request>";
@@ -1888,17 +1872,26 @@ int RILRequest::resetRadio()
     return ret ? 0 : -1;
 }
 
-int RILRequest::invokeOemRILRequestRaw(uint8_t *data)
+int RILRequest::invokeOemRILRequestRaw(uint8_t *data, int len)
 {
-    // obtain(RIL_REQUEST_OEM_HOOK_RAW);
+    obtain(RIL_REQUEST_OEM_HOOK_RAW);
 
-    // LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+    if (!data || len <= 0)
+    {
+        mParcel.writeInt32(-1);
+    }
+    else
+    {
+        mParcel.writeInt32(len);
+        mParcel.write(data, len);
+    }
 
-    // int ret = nonblockSend(this);
-    // if (!ret)
-    //     LOGE << "send request failed" << ENDL;
-    // return ret ? 0 : -1;
-    return 0;
+    LOGI << requestidToString(getRequestId()) + "> " << commandidToString(getCommandId()) << ENDL;
+
+    int ret = nonblockSend(this);
+    if (!ret)
+        LOGE << "send request failed" << ENDL;
+    return ret ? 0 : -1;
 }
 
 int RILRequest::invokeOemRILRequestStrings(std::vector<std::string> strings)
@@ -2389,28 +2382,33 @@ void RILRequest::processSolicited(RILRequest *rr, Parcel &p)
     else
         LOGI << "RESP < " << commandidToString(rr->getCommandId()) << ENDL;
 
-    if（rr->mResponse)
+    /**
+     * user will pass an nil rr->mResponse, which indicate the response is not that important
+     * so, skip processing response
+     */
+    if (rr->mResponse)
     {
-        rr->mResponse->commandId = rr->getCommandId();
-        rr->mResponse->errorCode = error;
-        rr->mResponse->isUnsocilited = 0;
-        rr->mResponse->responseShow = nullptr;
-        rr->mResponse->responseFree = nullptr;
-        clock_gettime(CLOCK_MONOTONIC, &rr->mResponse->finishTime);
+        delete rr;
+        LOGD << "skip parser response for user does not care about it" << ENDL;
+        return;
     }
+
+    rr->mResponse->commandId = rr->getCommandId();
+    rr->mResponse->errorCode = error;
+    rr->mResponse->isUnsocilited = 0;
+    rr->mResponse->responseShow = nullptr;
+    rr->mResponse->responseFree = nullptr;
+    clock_gettime(CLOCK_MONOTONIC, &rr->mResponse->finishTime);
 
     if (error == 0 || p.dataAvail() > 0)
     {
         // either command succeeds or command fails but with data payload
-        auto processer = SocilitedResponseProcesser.find(rr->getCommandId());
-        if (processer != SocilitedResponseProcesser.end())
+        auto processer = rilcFindSocilitedProcesser(rr->getCommandId());
+        if (processer)
         {
-            if (rr->mResponse)
-            {
-                rr->mResponse->responseFree = processer->second.responseFree;
-                rr->mResponse->responseShow = processer->second.responseShow;
-            }
-            processer->second.responseParser(p, rr->mResponse);
+            rr->mResponse->responseFree = processer->responseFree;
+            rr->mResponse->responseShow = processer->responseShow;
+            processer->responseParser(p, rr->mResponse);
         }
         else
         {
@@ -2441,20 +2439,20 @@ void RILRequest::processUnsolicited(Parcel &p)
     LOGI << "RESP < " << responseToString(cmdid) << ENDL;
 
     // either command succeeds or command fails but with data payload
-    auto processer = UnSocilitedResponseProcesser.find(cmdid);
-    if (processer != UnSocilitedResponseProcesser.end())
+    auto processer = rilcFindUnSocilitedProcesser(cmdid);
+    if (processer)
     {
-        resp.responseFree = processer->second.responseFree;
-        resp.responseShow = processer->second.responseShow;
-        if (processer->second.callback)
+        resp.responseFree = processer->responseFree;
+        resp.responseShow = processer->responseShow;
+        if (processer->callback)
         {
-            processer->second.responseParser(p, &resp);
-            processer->second.callback(&resp);
+            processer->responseParser(p, &resp);
+            processer->callback(&resp);
         }
 
         if (cmdid == RIL_UNSOL_RIL_CONNECTED)
         {
-            processer->second.responseParser(p, &resp);
+            processer->responseParser(p, &resp);
             int *data = (int *)resp.responseData.array.data;
             mRilVersion = data[0];
             set_ril_version(mRilVersion);

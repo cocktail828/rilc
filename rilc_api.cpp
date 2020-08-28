@@ -71,10 +71,10 @@ int RILC_uninit()
 /**********************************************************************************/
 void rilc_unsocilited_register(int cmdid, void (*cb)(RILResponse *))
 {
-    auto processer = UnSocilitedResponseProcesser.find(cmdid);
-    if (processer != UnSocilitedResponseProcesser.end())
+    auto processer = rilcFindUnSocilitedProcesser(cmdid);
+    if (processer)
     {
-        processer->second.callback = cb;
+        processer->callback = cb;
         LOGI << "register callback for unsocilited: "
              << commandidToString(cmdid) << ENDL;
     }
@@ -86,10 +86,10 @@ void rilc_unsocilited_register(int cmdid, void (*cb)(RILResponse *))
 
 void rilc_unsocilited_deregister(int cmdid)
 {
-    auto processer = UnSocilitedResponseProcesser.find(cmdid);
-    if (processer != UnSocilitedResponseProcesser.end())
+    auto processer = rilcFindUnSocilitedProcesser(cmdid);
+    if (processer)
     {
-        processer->second.callback = nullptr;
+        processer->callback = nullptr;
         LOGI << "deregister callback for unsocilited: "
              << commandidToString(cmdid) << ENDL;
     }
@@ -640,10 +640,11 @@ int RILC_resetRadio(RILResponse *resp)
     RILC_REQUEST_NO_ARG(resetRadio, resp);
 }
 
-int RILC_invokeOemRILRequestRaw(RILResponse *resp, uint8_t *data)
+int RILC_invokeOemRILRequestRaw(RILResponse *resp, uint8_t *data, int len)
 {
-    // RILC_REQUEST_WITH_ARG(invokeOemRILRequestRaw, resp,
-    //                       data);
+    RILC_REQUEST_WITH_ARG(invokeOemRILRequestRaw, resp,
+                          data,
+                          len);
     return 0;
 }
 

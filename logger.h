@@ -99,7 +99,7 @@ public:
     Logger &operator<<(const char *t)
     {
         std::lock_guard<std::mutex> _lk(m_lk);
-        ss << t;
+        ss << (t == nullptr ? "" : t);
         return *this;
     }
 

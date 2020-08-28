@@ -129,8 +129,7 @@ int RILC_sendUSSD(RILResponse *resp, const char *ussdString);
 int RILC_cancelPendingUssd(RILResponse *resp);
 int RILC_resetRadio(RILResponse *resp);
 
-// int RILC_invokeOemRILRequestRaw(RILResponse *resp, uint8_t *data);
-
+int RILC_invokeOemRILRequestRaw(RILResponse *resp, uint8_t *data, int len);
 int RILC_invokeOemRILRequestStrings(RILResponse *resp, int num, const char **strings);
 int RILC_setBandMode(RILResponse *resp, int bandMode);
 int RILC_queryAvailableBandMode(RILResponse *resp);

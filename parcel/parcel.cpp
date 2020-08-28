@@ -189,6 +189,29 @@ status_t Parcel::writeInt32(int32_t val)
     return writeAligned(val);
 }
 
+status_t Parcel::writeInt64(int64_t val)
+{
+    return writeAligned(val);
+}
+
+status_t Parcel::write(const void *data, size_t len)
+{
+    if (len > INT32_MAX)
+    {
+        // don't accept size_t values which may have come from an
+        // inadvertent conversion from a negative int.
+        return NOT_ENOUGH_DATA;
+    }
+
+    void *const d = writeInplace(len);
+    if (d)
+    {
+        memcpy(d, data, len);
+        return NO_ERROR;
+    }
+    return NO_ERROR;
+}
+
 template <class T>
 status_t Parcel::writeAligned(T val)
 {
@@ -262,6 +285,30 @@ const void *Parcel::readInplace(size_t len) const
 int32_t Parcel::readInt32() const
 {
     return readAligned<int32_t>();
+}
+
+int64_t Parcel::readInt64() const
+{
+    return readAligned<int64_t>();
+}
+
+status_t Parcel::read(void *outData, size_t len)
+{
+    if (len > INT32_MAX)
+    {
+        // don't accept size_t values which may have come from an
+        // inadvertent conversion from a negative int.
+        return NOT_ENOUGH_DATA;
+    }
+
+    if ((mDataPos + pad_size(len)) >= mDataPos && (mDataPos + pad_size(len)) <= mDataSize && len <= pad_size(len))
+    {
+        memcpy(outData, mData + mDataPos, len);
+        mDataPos += pad_size(len);
+        //ALOGV("read Setting data pos of %p to %zu", this, mDataPos);
+        return NO_ERROR;
+    }
+    return NOT_ENOUGH_DATA;
 }
 
 template <class T>
