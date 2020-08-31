@@ -1100,164 +1100,180 @@ void responseCdmaInformationRecord(Parcel &p, RILResponse *resp)
     if (!resp)
         return;
 
-    // int num = p.readInt32();
-    // RIL_CDMA_InformationRecords *response = (RIL_CDMA_InformationRecords *)malloc(num * sizeof(RIL_CDMA_InformationRecords));
-    // ERROR_MALLOC0(response, num * sizeof(RIL_CDMA_InformationRecords));
+    RIL_CDMA_InformationRecords *response = (RIL_CDMA_InformationRecords *)malloc(sizeof(RIL_CDMA_InformationRecords));
+    ERROR_MALLOC0(response, sizeof(RIL_CDMA_InformationRecords));
 
-    // for (int i = 0; i < num; i++)
-    // {
-    //     RIL_CDMA_InformationRecord *infoRec = &response->infoRec[i];
-    //     infoRec->name = static_cast<RIL_CDMA_InfoRecName>(p.readInt32());
-    //     switch (infoRec->name)
-    //     {
-    //     case RIL_CDMA_DISPLAY_INFO_REC:
-    //     case RIL_CDMA_EXTENDED_DISPLAY_INFO_REC:
-    //     {
-    //         if (infoRec->rec.display.alpha_len > CDMA_ALPHA_INFO_BUFFER_LENGTH)
-    //         {
-    //             return RIL_ERRNO_INVALID_RESPONSE;
-    //         }
-    //         string8 = (char *)malloc((infoRec->rec.display.alpha_len + 1) * sizeof(char));
-    //         for (int i = 0; i < infoRec->rec.display.alpha_len; i++)
-    //         {
-    //             string8[i] = infoRec->rec.display.alpha_buf[i];
-    //         }
-    //         string8[(int)infoRec->rec.display.alpha_len] = '\0';
-    //         writeStringToParcel(p, (const char *)string8);
-    //         free(string8);
-    //         string8 = NULL;
-    //         break;
-    //     }
-    //     case RIL_CDMA_CALLED_PARTY_NUMBER_INFO_REC:
-    //     case RIL_CDMA_CALLING_PARTY_NUMBER_INFO_REC:
-    //     case RIL_CDMA_CONNECTED_NUMBER_INFO_REC:
-    //     {
-    //         if (infoRec->rec.number.len > CDMA_NUMBER_INFO_BUFFER_LENGTH)
-    //         {
-    //             RLOGE("invalid display info response length %d expected not more than %d\n",
-    //                   (int)infoRec->rec.number.len,
-    //                   CDMA_NUMBER_INFO_BUFFER_LENGTH);
-    //             return RIL_ERRNO_INVALID_RESPONSE;
-    //         }
-    //         string8 = (char *)malloc((infoRec->rec.number.len + 1) * sizeof(char));
-    //         for (int i = 0; i < infoRec->rec.number.len; i++)
-    //         {
-    //             string8[i] = infoRec->rec.number.buf[i];
-    //         }
-    //         string8[(int)infoRec->rec.number.len] = '\0';
-    //         writeStringToParcel(p, (const char *)string8);
-    //         free(string8);
-    //         string8 = NULL;
-    //         p.readInt32(infoRec->rec.number.number_type);
-    //         p.readInt32(infoRec->rec.number.number_plan);
-    //         p.readInt32(infoRec->rec.number.pi);
-    //         p.readInt32(infoRec->rec.number.si);
-    //         break;
-    //     }
-    //     case RIL_CDMA_SIGNAL_INFO_REC:
-    //     {
-    //         p.readInt32(infoRec->rec.signal.isPresent);
-    //         p.readInt32(infoRec->rec.signal.signalType);
-    //         p.readInt32(infoRec->rec.signal.alertPitch);
-    //         p.readInt32(infoRec->rec.signal.signal);
+    int num = p.readInt32();
+    response->numberOfInfoRecs = (num < RIL_CDMA_MAX_NUMBER_OF_INFO_RECS) ? num : RIL_CDMA_MAX_NUMBER_OF_INFO_RECS;
+    for (int i = 0; i < response->numberOfInfoRecs; i++)
+    {
+        response->infoRec[i].name = static_cast<RIL_CDMA_InfoRecName>(p.readInt32());
+        if (response->infoRec[i].name == RIL_CDMA_DISPLAY_INFO_REC ||
+            response->infoRec[i].name == RIL_CDMA_EXTENDED_DISPLAY_INFO_REC)
+        {
+            //response->infoRec[i].rec.display.alpha_len = p.readInt32();
+            snprintf(response->infoRec[i].rec.display.alpha_buf, 64, "%s", p.readString());
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_CALLED_PARTY_NUMBER_INFO_REC ||
+                 response->infoRec[i].name == RIL_CDMA_CALLING_PARTY_NUMBER_INFO_REC ||
+                 response->infoRec[i].name == RIL_CDMA_CONNECTED_NUMBER_INFO_REC)
+        {
+            //response->infoRec[i].rec.number.len = p.readInt32(); already read in readString
+            snprintf(response->infoRec[i].rec.number.buf, 81, "%s", p.readString());
+            response->infoRec[i].rec.number.number_type = p.readInt32();
+            response->infoRec[i].rec.number.number_plan = p.readInt32();
+            response->infoRec[i].rec.number.pi = p.readInt32();
+            response->infoRec[i].rec.number.si = p.readInt32();
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_SIGNAL_INFO_REC)
+        {
+            response->infoRec[i].rec.signal.isPresent = p.readInt32();
+            response->infoRec[i].rec.signal.signalType = p.readInt32();
+            response->infoRec[i].rec.signal.alertPitch = p.readInt32();
+            response->infoRec[i].rec.signal.signal = p.readInt32();
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_REDIRECTING_NUMBER_INFO_REC)
+        {
+            snprintf(response->infoRec[i].rec.redir.redirectingNumber.buf, 81, "%s", p.readString());
+            response->infoRec[i].rec.redir.redirectingNumber.number_type = p.readInt32();
+            response->infoRec[i].rec.redir.redirectingNumber.number_plan = p.readInt32();
+            response->infoRec[i].rec.redir.redirectingNumber.pi = p.readInt32();
+            response->infoRec[i].rec.redir.redirectingNumber.si = p.readInt32();
+            response->infoRec[i].rec.redir.redirectingReason = static_cast<RIL_CDMA_RedirectingReason>(p.readInt32());
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_LINE_CONTROL_INFO_REC)
+        {
+            response->infoRec[i].rec.lineCtrl.lineCtrlPolarityIncluded = p.readInt32();
+            response->infoRec[i].rec.lineCtrl.lineCtrlToggle = p.readInt32();
+            response->infoRec[i].rec.lineCtrl.lineCtrlReverse = p.readInt32();
+            response->infoRec[i].rec.lineCtrl.lineCtrlPowerDenial = p.readInt32();
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_T53_CLIR_INFO_REC)
+        {
+            response->infoRec[i].rec.clir.cause = p.readInt32();
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_T53_AUDIO_CONTROL_INFO_REC)
+        {
+            response->infoRec[i].rec.audioCtrl.upLink = p.readInt32();
+            response->infoRec[i].rec.audioCtrl.downLink = p.readInt32();
+        }
+        // else if (response->infoRec[i].name == RIL_CDMA_T53_RELEASE_INFO_REC)
+        // {
+        //     LOGE << "NOT SUPPORT" << ENDL;
+        //     return;
+        // }
+        // else
+        // {
+        //     LOGE << "Incorrect name value" << ENDL;
+        //     return;
+        // }
+    }
 
-    //         appendPrintBuf("%sisPresent = %X, signalType = %X, alertPitch = %X, signal = %X, ",
-    //                        printBuf, (int)infoRec->rec.signal.isPresent,
-    //                        (int)infoRec->rec.signal.signalType,
-    //                        (int)infoRec->rec.signal.alertPitch,
-    //                        (int)infoRec->rec.signal.signal);
-    //         removeLastChar;
-    //         break;
-    //     }
-    //     case RIL_CDMA_REDIRECTING_NUMBER_INFO_REC:
-    //     {
-    //         if (infoRec->rec.redir.redirectingNumber.len >
-    //             CDMA_NUMBER_INFO_BUFFER_LENGTH)
-    //         {
-    //             RLOGE("invalid display info response length %d expected not more than %d\n",
-    //                   (int)infoRec->rec.redir.redirectingNumber.len,
-    //                   CDMA_NUMBER_INFO_BUFFER_LENGTH);
-    //             return RIL_ERRNO_INVALID_RESPONSE;
-    //         }
-    //         string8 = (char *)malloc((infoRec->rec.redir.redirectingNumber
-    //                                       .len +
-    //                                   1) *
-    //                                  sizeof(char));
-    //         for (int i = 0; i < infoRec->rec.redir.redirectingNumber.len;
-    //              i++)
-    //         {
-    //             string8[i] = infoRec->rec.redir.redirectingNumber.buf[i];
-    //         }
-    //         string8[(int)infoRec->rec.redir.redirectingNumber.len] = '\0';
-    //         writeStringToParcel(p, (const char *)string8);
-    //         free(string8);
-    //         string8 = NULL;
-    //         p.readInt32(infoRec->rec.redir.redirectingNumber.number_type);
-    //         p.readInt32(infoRec->rec.redir.redirectingNumber.number_plan);
-    //         p.readInt32(infoRec->rec.redir.redirectingNumber.pi);
-    //         p.readInt32(infoRec->rec.redir.redirectingNumber.si);
-    //         p.readInt32(infoRec->rec.redir.redirectingReason);
-    //         break;
-    //     }
-    //     case RIL_CDMA_LINE_CONTROL_INFO_REC:
-    //     {
-    //         p.readInt32(infoRec->rec.lineCtrl.lineCtrlPolarityIncluded);
-    //         p.readInt32(infoRec->rec.lineCtrl.lineCtrlToggle);
-    //         p.readInt32(infoRec->rec.lineCtrl.lineCtrlReverse);
-    //         p.readInt32(infoRec->rec.lineCtrl.lineCtrlPowerDenial);
-
-    //         appendPrintBuf("%slineCtrlPolarityIncluded = %d, lineCtrlToggle = %d, lineCtrlReverse = %d, lineCtrlPowerDenial = %d, ",
-    //                        printBuf,
-    //                        (int)infoRec->rec.lineCtrl.lineCtrlPolarityIncluded,
-    //                        (int)infoRec->rec.lineCtrl.lineCtrlToggle,
-    //                        (int)infoRec->rec.lineCtrl.lineCtrlReverse,
-    //                        (int)infoRec->rec.lineCtrl.lineCtrlPowerDenial);
-    //         removeLastChar;
-    //         break;
-    //     }
-    //     case RIL_CDMA_T53_CLIR_INFO_REC:
-    //     {
-    //         p.readInt32((int)(infoRec->rec.clir.cause));
-
-    //         appendPrintBuf("%scause%d", printBuf, infoRec->rec.clir.cause);
-    //         removeLastChar;
-    //         break;
-    //     }
-    //     case RIL_CDMA_T53_AUDIO_CONTROL_INFO_REC:
-    //     {
-    //         p.readInt32(infoRec->rec.audioCtrl.upLink);
-    //         p.readInt32(infoRec->rec.audioCtrl.downLink);
-
-    //         appendPrintBuf("%supLink=%d, downLink=%d, ", printBuf,
-    //                        infoRec->rec.audioCtrl.upLink,
-    //                        infoRec->rec.audioCtrl.downLink);
-    //         removeLastChar;
-    //         break;
-    //     }
-    //     case RIL_CDMA_T53_RELEASE_INFO_REC:
-    //         // TODO(Moto): See David Krause, he has the answer:)
-    //         RLOGE("RIL_CDMA_T53_RELEASE_INFO_REC: return INVALID_RESPONSE");
-    //         return RIL_ERRNO_INVALID_RESPONSE;
-    //     default:
-    //         RLOGE("Incorrect name value");
-    //         return RIL_ERRNO_INVALID_RESPONSE;
-    //     }
-    // }
-    LOGI << __func__ << " has not been implement yet" << ENDL;
+    resp->responseType = TYPE_STRUCT;
+    resp->responseData.array.num = 1;
+    resp->responseData.array.data = response;
 }
 
 void responseCdmaInformationRecordShow(RILResponse *resp)
 {
-    LOGI << __func__ << " has not been implement yet" << ENDL;
     if (!resp)
         return;
+
+    RIL_CDMA_InformationRecords *response = (RIL_CDMA_InformationRecords *)resp->responseData.array.data;
+
+    LOGI << "UNMARSHALL: num of struct = " << response->numberOfInfoRecs << ENDL;
+    for (int i = 0; i < response->numberOfInfoRecs; i++)
+    {
+        LOGI << "  [" << i << "].name = " << response->infoRec[i].name << ENDL;
+        if (response->infoRec[i].name == RIL_CDMA_DISPLAY_INFO_REC ||
+            response->infoRec[i].name == RIL_CDMA_EXTENDED_DISPLAY_INFO_REC)
+        {
+            //response->infoRec[i].rec.display.alpha_len = p.readInt32();
+            LOGI << "  infoRec[" << i << "].rec.display.alpha_buf = "
+                 << response->infoRec[i].rec.display.alpha_buf << ENDL;
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_CALLED_PARTY_NUMBER_INFO_REC ||
+                 response->infoRec[i].name == RIL_CDMA_CALLING_PARTY_NUMBER_INFO_REC ||
+                 response->infoRec[i].name == RIL_CDMA_CONNECTED_NUMBER_INFO_REC)
+        {
+            //response->infoRec[i].rec.number.len = p.readInt32(); already read in readString
+            LOGI << "  infoRec[" << i << "].rec.number.buf = "
+                 << response->infoRec[i].rec.number.buf << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.number.number_type = "
+                 << response->infoRec[i].rec.number.number_type << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.number.number_plan = "
+                 << response->infoRec[i].rec.number.number_plan << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.number.pi = "
+                 << response->infoRec[i].rec.number.pi << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.number.si = "
+                 << response->infoRec[i].rec.number.si << ENDL;
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_SIGNAL_INFO_REC)
+        {
+            LOGI << "  infoRec[" << i << "].rec.signal.isPresent = "
+                 << response->infoRec[i].rec.signal.isPresent << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.signal.signalType = "
+                 << response->infoRec[i].rec.signal.signalType << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.signal.alertPitch = "
+                 << response->infoRec[i].rec.signal.alertPitch << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.signal.signal = "
+                 << response->infoRec[i].rec.signal.signal << ENDL;
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_REDIRECTING_NUMBER_INFO_REC)
+        {
+            LOGI << "  infoRec[" << i << "].rec.redir.redirectingNumber.buf = "
+                 << response->infoRec[i].rec.redir.redirectingNumber.buf << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.redir.redirectingNumber.number_type = "
+                 << response->infoRec[i].rec.redir.redirectingNumber.number_type << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.redir.redirectingNumber.number_plan = "
+                 << response->infoRec[i].rec.redir.redirectingNumber.number_plan << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.redir.redirectingNumber.pi = "
+                 << response->infoRec[i].rec.redir.redirectingNumber.pi << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.redir.redirectingNumber.si = "
+                 << response->infoRec[i].rec.redir.redirectingNumber.si << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.redir.redirectingReason = "
+                 << response->infoRec[i].rec.redir.redirectingReason << ENDL;
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_LINE_CONTROL_INFO_REC)
+        {
+            LOGI << "  infoRec[" << i << "].rec.lineCtrl.lineCtrlPolarityIncluded = "
+                 << response->infoRec[i].rec.lineCtrl.lineCtrlPolarityIncluded << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.lineCtrl.lineCtrlToggle = "
+                 << response->infoRec[i].rec.lineCtrl.lineCtrlToggle << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.lineCtrl.lineCtrlReverse = "
+                 << response->infoRec[i].rec.lineCtrl.lineCtrlReverse << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.lineCtrl.lineCtrlPowerDenial = "
+                 << response->infoRec[i].rec.lineCtrl.lineCtrlPowerDenial << ENDL;
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_T53_CLIR_INFO_REC)
+        {
+            LOGI << "  infoRec[" << i << "].rec.clir.cause = "
+                 << response->infoRec[i].rec.clir.cause << ENDL;
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_T53_AUDIO_CONTROL_INFO_REC)
+        {
+            LOGI << "  infoRec[" << i << "].rec.audioCtrl.upLink  = "
+                 << response->infoRec[i].rec.audioCtrl.upLink << ENDL;
+            LOGI << "  infoRec[" << i << "].rec.audioCtrl.downLink = "
+                 << response->infoRec[i].rec.audioCtrl.downLink << ENDL;
+        }
+        else if (response->infoRec[i].name == RIL_CDMA_T53_RELEASE_INFO_REC)
+        {
+            LOGE << "NOT SUPPORT" << ENDL;
+            return;
+        }
+        else
+            LOGE << "Incorrect name value" << ENDL;
+        return;
+    }
 }
 
 void responseCdmaInformationRecordFree(RILResponse *resp)
 {
-    LOGI << __func__ << " has not been implement yet" << ENDL;
     if (!resp)
         return;
+
+    SAFETYFREE(resp->responseData.array.data);
 }
 
 /**
