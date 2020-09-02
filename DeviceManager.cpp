@@ -70,7 +70,21 @@ void pollingRead(DeviceManager *args)
                     static uint8_t recvBuff[MAX_RILD_DATA_SIZE]; // RIL message has max size of 8K
                     int length = 0;
 
+                    /** NOTICE
+                     * sometimes, rilc will get multiple response at one time, or get malformed message.
+                     * so, rilc should know whether the packet, it gets is legal or not!
+                     * my solution is, add 4 byte magic number 0x5f3759df(do not ask why) at the beginning of the response
+                     * rilc will check the header then it will know whether the response is ok or not!
+                     */
+                    // const uint32_t magic_number = 0x5f3759df;
+                    // if (args->recvAsync(&length, 4, &olen))
+                    // {
+                    //     if (length != magic_number)
+                    //         continue;
+                    // }
+
                     // read message length
+                    length = 0;
                     if (args->recvAsync(&length, 4, &olen))
                     {
                         length = be32toh(length);
@@ -86,7 +100,7 @@ void pollingRead(DeviceManager *args)
                         int expect_len = length;
                         int read_len = 0;
                         int try_time = 0;
-                        const int max_try = 10;
+                        const int max_try = 5;
                         do
                         {
                             if (args->recvAsync((uint8_t *)recvBuff + read_len, length, &olen) && olen > 0)
